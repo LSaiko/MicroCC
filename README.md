@@ -1,5 +1,7 @@
 # MicroCC — Microscopy Cell Counter
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/LSaiko/MicroCC/blob/main/bbbc039/usage_example.ipynb)
+
 YOLOv8 nucleus **detection** for counting cells in fluorescence microscopy images.
 Counting by detection (not segmentation): each nucleus gets a bounding box, the
 count is `len(boxes)`. Faster at inference than instance segmentation and more
