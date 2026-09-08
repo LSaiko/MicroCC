@@ -50,13 +50,80 @@ through one torchmetrics harness:
 | FCOS | 0.838 | 0.796 | 13.8 | 67 |
 | Faster R-CNN | 0.839 | 0.785 | 13.4 | 90 |
 
-RT-DETR-L matches YOLO on mAP@50 and beats it on recall and counting (NMS-free
-set prediction — no nucleus suppressed by a neighbour), at 1.6× the latency.
-The three ResNet50-FPN torchvision nets all plateau ~10 pts back — they run at
-~800 px where a 20 px nucleus is ~12 px. Full study:
-[compare/RESULTS.md](compare/RESULTS.md).
-
 ![model comparison](showcase/model_comparison.png)
+
+#### Significance (for these 5 models, as configured)
+
+- **Resolution beats architecture.** The ~10-pt mAP gap between the two groups is
+  input size (1280/960 vs ~800), not RPN vs. dense vs. transformer. Fix
+  resolution/tiling *before* comparing model families.
+- **mAP@50 doesn't rank counting accuracy.** FCOS and Faster R-CNN have identical
+  mAP yet miss 13–14 nuclei/image; RetinaNet's mAP is mediocre but it counts
+  fine once tuned. Read the count-MAE column for this task.
+- **Confidence calibration is per-model.** Best counting threshold: 0.70
+  RT-DETR / 0.50 YOLO / 0.25 RetinaNet — a 3× spread. Hard-coding `conf=0.5`
+  from a YOLO tutorial and swapping in RetinaNet silently under-counts ~18 %.
+- **NMS-free helps dense fields.** RT-DETR's mAR@500 0.910 vs. everyone else's
+  ~0.80: NMS deletes a box overlapping a higher-scoring one, and confluent
+  nuclei overlap, so NMS discards correct detections. RT-DETR's set loss runs no
+  NMS. This is the exact failure mode "detection over segmentation" exists to
+  dodge.
+- **Two-stage doesn't pay off here.** Faster R-CNN is the biggest and slowest and
+  worst: its RPN proposal budget spreads thin over 100+ near-identical objects,
+  capping recall before stage two runs.
+
+#### Which model to use
+
+| If you need… | Pick | Caveat |
+|---|---|---|
+| Lowest latency, simplest stack | **YOLOv8s** | counting tied with RT-DETR only *after* conf tuning; lower raw recall |
+| Best accuracy / recall / tightest boxes; crowded or confluent fields | **RT-DETR-L** | 1.6× slower (55 ms), 3× the params, needs conf ≈ 0.70, 960 px = 7 GB VRAM |
+| Already committed to a `torchvision` pipeline | **RetinaNet** | only if retrained at ≥1024 px; must set conf ≈ 0.25 |
+| — | ~~FCOS / Faster R-CNN~~ | dominated on every axis at this resolution; no reason to choose them here |
+
+#### Capacity vs. hardware (measured on RTX 5060, 8 GB)
+
+| Model | Params | Train config that fits 8 GB | Peak VRAM (train) | Infer ms/img¹ | Train time |
+|---|---|---|---|---|---|
+| YOLOv8s | 11 M | 1280 px, batch 4 | 5.4 GB (measured) | 35 | ~15 min (best @ ep 43) |
+| RT-DETR-L | 32 M | **960 px**, batch 4 (1280 OOMs) | 7.1 GB (measured) | 55 | ~20 min (converged ep 47) |
+| RetinaNet | 36 M | ~800 px, batch 2 | ~5 GB (est.) | 65 | ~25 min (40 ep) |
+| FCOS | 32 M | ~800 px, batch 2 | ~5 GB (est.) | 67 | ~100 min (40 ep, slow head) |
+| Faster R-CNN | 43 M | ~800 px, batch 2 | ~5 GB (est.) | 90 | ~25 min (40 ep) |
+
+¹ YOLO's figure includes image load from disk; the torchvision models were handed
+pre-loaded tensors, so YOLO's real inference margin over them is larger. The P2
+(stride-4) YOLO variant OOMs at ≥640 px on 8 GB — not in this table for that
+reason.
+
+Practical reading: on an **8 GB** card only YOLOv8s trains at full 1280 px; RT-DETR
+needs 960 and the P2-head YOLO variant does not fit at all. On **≤4 GB**, drop to
+640 px / batch 2 (expect the mAP hit from finding 1). On **≥16 GB**, RT-DETR at
+1280 px and larger batches is the obvious next experiment (see below). CPU-only
+inference is viable for one-off counts (~1–3 s/image at 1280) but not for
+batches.
+
+#### Proposed future studies
+
+1. **Fair-resolution rematch.** Retrain Faster R-CNN / RetinaNet / FCOS at
+   1280 px (`min_size=1280`) to isolate architecture from input size — finding 1
+   predicts they close most of the gap; confirm and quantify.
+2. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU — does it pull clear of
+   YOLO on mAP@50, not just recall?
+3. **Detection vs. segmentation baseline.** Add Cellpose / StarDist (the
+   bioimaging-standard instance-segmentation tools) and compare count MAE — the
+   comparison the task framing implies but this study skipped.
+4. **Tiling (SAHI) instead of big inputs** — 512 px tiles at 20 % overlap on the
+   torchvision nets; cheaper than 1280 px full-frame, may recover the gap on
+   modest hardware.
+5. **Cross-dataset generalisation.** Train on BBBC039, evaluate zero-shot on
+   BBBC038 / DSB2018 — does RT-DETR's NMS-free recall advantage survive a domain
+   shift, or is it overfit to this nucleus density?
+6. **Count-calibrated training.** Add a count-consistency loss or a learned
+   per-image threshold, so the model optimises the deployed metric directly
+   instead of relying on a post-hoc conf sweep.
+
+Full study and per-model detail: [compare/RESULTS.md](compare/RESULTS.md).
 
 ![training curves](showcase/training_curves.png)
 ![precision-recall](showcase/pr_curve.png)
