@@ -69,8 +69,9 @@ python bbbc039/evaluate.py --model runs/detect/*/weights/best.pt --data dataset/
 `python bbbc039/test_masks_to_yolo.py` runs the label-conversion self-check.
 
 **Just want to count cells with the trained model?** See
-[bbbc039/usage_example.ipynb](bbbc039/usage_example.ipynb) — downloads the
-release weights and runs inference on one image or a folder.
+[bbbc039/usage_example.ipynb](bbbc039/usage_example.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/LSaiko/MicroCC/blob/main/bbbc039/usage_example.ipynb)
+— downloads the release weights and runs inference on one image or a folder.
 
 ## Tuning
 
