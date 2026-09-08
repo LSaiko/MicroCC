@@ -27,15 +27,23 @@ CONF = 0.5          # matches evaluate.py; counting is measured at this threshol
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def yolo_preds(weights, ds):
-    from ultralytics import YOLO
-    model = YOLO(weights)
+def ultralytics_preds(cls, weights, ds, imgsz):
+    model = cls(weights)
     for i in range(len(ds)):
-        p = ds.imgs[i]
-        r = model.predict(str(p), conf=0.001, iou=0.6, imgsz=1280,
+        r = model.predict(str(ds.imgs[i]), conf=0.001, iou=0.6, imgsz=imgsz,
                           max_det=1000, verbose=False)[0].boxes
         yield {"boxes": r.xyxy.cpu(), "scores": r.conf.cpu(),
                "labels": torch.ones(len(r), dtype=torch.int64)}
+
+
+def yolo_preds(weights, ds):
+    from ultralytics import YOLO
+    return ultralytics_preds(YOLO, weights, ds, 1280)
+
+
+def rtdetr_preds(weights, ds):
+    from ultralytics import RTDETR
+    return ultralytics_preds(RTDETR, weights, ds, 960)
 
 
 def tv_preds(weights, ds, arch):
@@ -101,12 +109,18 @@ def score(pred_iter, ds):
 
 def main():
     ds = YoloDetectionDataset("dataset", "val", train=False)
-    yolo_w = sorted(glob.glob("runs/detect/**/weights/best.pt", recursive=True),
+    yolo_w = sorted((p for p in glob.glob("runs/detect/**/weights/best.pt", recursive=True)
+                     if "rtdetr" not in p and "compare" not in p),
                     key=lambda p: pathlib.Path(p).stat().st_mtime)
     jobs = []
     if yolo_w:
         jobs.append(("YOLOv8s", lambda: yolo_preds(yolo_w[-1], ds)))
-    for arch, label in (("fasterrcnn", "Faster R-CNN"), ("retinanet", "RetinaNet")):
+    rtdetr_w = next(iter(sorted(glob.glob("**/rtdetr*/weights/best.pt", recursive=True),
+                                key=lambda p: pathlib.Path(p).stat().st_mtime, reverse=True)), None)
+    if rtdetr_w:
+        jobs.append(("RT-DETR-L", lambda: rtdetr_preds(rtdetr_w, ds)))
+    for arch, label in (("fasterrcnn", "Faster R-CNN"), ("retinanet", "RetinaNet"),
+                        ("fcos", "FCOS")):
         w = f"compare/runs/{arch}/best.pt"
         if pathlib.Path(w).exists():
             jobs.append((label, (lambda a=arch, ww=w: tv_preds(ww, ds, a))))
@@ -120,9 +134,9 @@ def main():
 
     cols = ["mAP50", "mAP75", "mAR500", "count_MAE@0.5", "best_conf",
             "count_MAE@best", "count_MAPE@best_pct", "ms_per_image"]
-    print(f"\n{'model':<14} " + " ".join(f"{c:>14}" for c in cols))
+    print(f"\n{'model':<14} " + " ".join(f"{c:>18}" for c in cols))
     for label, r in results.items():
-        print(f"{label:<14} " + " ".join(f"{r[c]:>14}" for c in cols))
+        print(f"{label:<14} " + " ".join(f"{r[c]:>18}" for c in cols))
     print("\nsaved -> compare/results.json")
 
 

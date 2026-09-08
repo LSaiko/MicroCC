@@ -9,7 +9,19 @@
     "best_conf": 0.5,
     "count_MAE@best": 3.2,
     "count_MAPE@best_pct": 3.18,
-    "ms_per_image": 34.6
+    "ms_per_image": 35.0
+  },
+  "RT-DETR-L": {
+    "mAP50": 0.9672,
+    "mAP75": 0.935,
+    "mAR500": 0.9102,
+    "count_MAE@0.5": 12.47,
+    "count_MAPE@0.5_pct": 11.78,
+    "count_bias@0.5": 499,
+    "best_conf": 0.7,
+    "count_MAE@best": 2.45,
+    "count_MAPE@best_pct": 2.52,
+    "ms_per_image": 55.5
   },
   "Faster R-CNN": {
     "mAP50": 0.839,
@@ -21,7 +33,7 @@
     "best_conf": 0.8,
     "count_MAE@best": 13.4,
     "count_MAPE@best_pct": 11.32,
-    "ms_per_image": 85.7
+    "ms_per_image": 89.6
   },
   "RetinaNet": {
     "mAP50": 0.8811,
@@ -33,6 +45,18 @@
     "best_conf": 0.25,
     "count_MAE@best": 3.45,
     "count_MAPE@best_pct": 3.53,
-    "ms_per_image": 62.8
+    "ms_per_image": 65.0
+  },
+  "FCOS": {
+    "mAP50": 0.8384,
+    "mAP75": 0.8371,
+    "mAR500": 0.7956,
+    "count_MAE@0.5": 13.75,
+    "count_MAPE@0.5_pct": 11.96,
+    "count_bias@0.5": -530,
+    "best_conf": 0.5,
+    "count_MAE@best": 13.75,
+    "count_MAPE@best_pct": 11.96,
+    "ms_per_image": 67.0
   }
 }

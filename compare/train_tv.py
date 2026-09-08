@@ -19,10 +19,13 @@ from dataset import YoloDetectionDataset, collate_fn  # noqa: E402
 MODELS = {
     "fasterrcnn": ("fasterrcnn_resnet50_fpn_v2", "FasterRCNN_ResNet50_FPN_V2_Weights"),
     "retinanet": ("retinanet_resnet50_fpn_v2", "RetinaNet_ResNet50_FPN_V2_Weights"),
+    "fcos": ("fcos_resnet50_fpn", "FCOS_ResNet50_FPN_Weights"),
 }
 
 
 def build(name):
+    import functools
+
     import torchvision.models.detection as det
     fn_name, w_name = MODELS[name]
     weights = getattr(det, w_name).COCO_V1
@@ -32,15 +35,18 @@ def build(name):
         from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
         in_f = model.roi_heads.box_predictor.cls_score.in_features
         model.roi_heads.box_predictor = FastRCNNPredictor(in_f, 2)
-    else:
-        import functools
-
+    elif name == "retinanet":
         from torchvision.models.detection.retinanet import RetinaNetClassificationHead
         n_anchors = model.head.classification_head.num_anchors
         in_ch = model.backbone.out_channels
         model.head.classification_head = RetinaNetClassificationHead(
             in_ch, n_anchors, 2, norm_layer=functools.partial(torch.nn.GroupNorm, 32)
         )
+    elif name == "fcos":
+        from torchvision.models.detection.fcos import FCOSClassificationHead
+        n_anchors = model.head.classification_head.num_anchors
+        in_ch = model.backbone.out_channels
+        model.head.classification_head = FCOSClassificationHead(in_ch, n_anchors, 2)
     return model
 
 

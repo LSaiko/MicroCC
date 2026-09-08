@@ -39,16 +39,22 @@ More predictions: [showcase/val_predictions_2.jpg](showcase/val_predictions_2.jp
 
 ### vs. other detectors
 
-Faster R-CNN and RetinaNet (torchvision, ResNet50-FPN) trained on the same split:
+RT-DETR-L, RetinaNet, FCOS and Faster R-CNN trained on the same split, scored
+through one torchmetrics harness:
 
-| Model | mAP@50 | count MAE (tuned) | ms/img |
-|---|---|---|---|
-| **YOLOv8s** | **0.969** | **3.2** | **35** |
-| RetinaNet | 0.881 | 3.5 | 63 |
-| Faster R-CNN | 0.839 | 13.4 | 86 |
+| Model | mAP@50 | mAR@500 | count MAE (tuned) | ms/img |
+|---|---|---|---|---|
+| **YOLOv8s** | **0.969** | 0.786 | 3.2 | **35** |
+| RT-DETR-L | 0.967 | **0.910** | **2.5** | 55 |
+| RetinaNet | 0.881 | 0.822 | 3.5 | 65 |
+| FCOS | 0.838 | 0.796 | 13.8 | 67 |
+| Faster R-CNN | 0.839 | 0.785 | 13.4 | 90 |
 
-(mAP@50 here uses a shared torchmetrics harness, hence 0.969 vs the 0.979 from
-ultralytics' own validator above.) Full study: [compare/RESULTS.md](compare/RESULTS.md).
+RT-DETR-L matches YOLO on mAP@50 and beats it on recall and counting (NMS-free
+set prediction — no nucleus suppressed by a neighbour), at 1.6× the latency.
+The three ResNet50-FPN torchvision nets all plateau ~10 pts back — they run at
+~800 px where a 20 px nucleus is ~12 px. Full study:
+[compare/RESULTS.md](compare/RESULTS.md).
 
 ![model comparison](showcase/model_comparison.png)
 

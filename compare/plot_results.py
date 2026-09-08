@@ -7,7 +7,8 @@ import numpy as np
 
 r = json.loads(pathlib.Path("compare/results.json").read_text())
 models = list(r)
-fig, axes = plt.subplots(1, 3, figsize=(13, 4))
+palette = plt.cm.tab10(np.linspace(0, 1, 10))[:len(models)]
+fig, axes = plt.subplots(1, 3, figsize=(max(13, 2.4 * len(models)), 4))
 
 for ax, (key, title, fmt) in zip(axes, [
     ("mAP50", "mAP@50 (higher better)", "{:.3f}"),
@@ -15,9 +16,9 @@ for ax, (key, title, fmt) in zip(axes, [
     ("ms_per_image", "Inference ms/image (lower better)", "{:.0f}"),
 ]):
     vals = [r[m][key] for m in models]
-    bars = ax.bar(models, vals, color=["#2a9d8f", "#e76f51", "#e9c46a"])
+    bars = ax.bar(models, vals, color=palette)
     ax.set_title(title, fontsize=10)
-    ax.tick_params(axis="x", labelsize=9)
+    ax.tick_params(axis="x", labelsize=8, rotation=20)
     for b, v in zip(bars, vals):
         ax.text(b.get_x() + b.get_width() / 2, v, fmt.format(v),
                 ha="center", va="bottom", fontsize=9)
