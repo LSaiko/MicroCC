@@ -10,6 +10,10 @@ robust when nuclei touch.
 Trained and evaluated on [BBBC039](https://bbbc.broadinstitute.org/BBBC039)
 (U2OS cell nuclei, Hoechst stain, 520×696 single-channel TIFF).
 
+📄 **[REPORT.md](REPORT.md)** — technical report: 7 models benchmarked, and why
+the architecture choice mattered less than the detection caps, the label
+quality, and the confidence threshold.
+
 **Topics:** `object-detection` · `yolov8` · `cell-counting` · `microscopy` ·
 `fluorescence` · `bioimage-analysis` · `ultralytics` · `bbbc039`
 
