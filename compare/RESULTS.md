@@ -69,6 +69,68 @@ you can afford 1.6× the latency — highest recall, best counting, tightest
 boxes, and you can drop NMS. The torchvision CNNs would need to be retrained at
 1280 px to be competitive; at default resolution they are not.
 
+## Why these findings matter
+
+Scope note: these conclusions hold for **the five models as configured here** —
+COCO-pretrained, single-class head, 160-image train set, one GPU, the resolutions
+in the table. They are engineering guidance for this task, not architecture
+verdicts in general.
+
+### 1. Resolution buys more than architecture — spend your effort there first
+
+The 10-point mAP gap between the two groups is almost entirely input size
+(1280/960 vs ~800), not RPN vs. dense vs. transformer. This is the highest-value
+takeaway because it inverts the usual instinct: reaching for a "better model"
+(two-stage, or a transformer) is the wrong first move when a 20 px object is
+being fed to the network at 12 px. The three torchvision nets are competent
+detectors crippled by their default `min_size=800`. Anyone reproducing a cell
+counter should set resolution and tiling *before* comparing model families —
+otherwise the comparison just measures who defaults to a bigger input.
+
+### 2. mAP@50 does not rank the models by counting accuracy — measure what you deploy
+
+RetinaNet (mAP@50 0.881) out-scores nothing that matters yet counts as well as
+YOLO (0.969) once its threshold is set; FCOS and Faster R-CNN have near-identical
+mAP (0.838 / 0.839) but that tells you nothing about the 13–14 nuclei/image they
+miss. mAP integrates over all confidence thresholds and all IoU operating points;
+a count is one threshold, one decision. The two are correlated but not
+rank-preserving. **The count MAE column is the one to read for this task**, and
+it only becomes meaningful after the per-model sweep — which is why the harness
+does the sweep rather than reporting a single fixed-threshold number.
+
+### 3. Confidence calibration is model-specific and must be re-tuned on every swap
+
+RT-DETR's optimal counting threshold is 0.70, RetinaNet's is 0.25, YOLO's is
+0.50 — a 3× spread. Focal-loss training (RetinaNet, FCOS) deliberately produces
+low, poorly-spread scores; RT-DETR's set-based loss produces high-confidence
+queries. A pipeline that hard-codes `conf=0.5` from a YOLO tutorial and then
+swaps in RetinaNet will silently under-count by ~18 %. The threshold is not a
+model constant — it is a per-model, per-dataset hyperparameter, and it moves the
+count MAE by 5–15× (see `count_MAE@0.5` vs `count_MAE@best`).
+
+### 4. NMS-free detection is a structural advantage for dense biological counting
+
+RT-DETR's mAR@500 of 0.910 vs. everyone else's 0.79–0.82 is the study's cleanest
+architectural result. NMS removes a box when it overlaps a higher-scoring box
+past an IoU cut; in a confluent nucleus field, adjacent true nuclei *do* overlap,
+so NMS throws away correct detections. RT-DETR predicts a fixed set with a
+one-to-one matching loss and never runs NMS, so touching nuclei survive. This is
+exactly the failure mode the task's framing (detection over segmentation because
+"cells overlap") is trying to avoid — and it is the reason RT-DETR posts the best
+count MAE despite training at lower resolution than YOLO. For crowded fields the
+detector's duplicate-removal mechanism matters more than its backbone.
+
+### 5. The two-stage premise doesn't pay off here
+
+Faster R-CNN is the most expensive model (43 M params, 90 ms) and the worst
+overall. Its RoI head can only refine what the RPN proposes, and the RPN's
+top-k proposal budget is spread thin across 100+ objects per image, so recall is
+capped before the second stage runs. The "two-stage is more accurate" heuristic
+comes from benchmarks with a handful of large objects per image; it does not
+transfer to hundreds of tiny, near-identical ones. FCOS reaching the same
+mAP from the anchor-free-FCN direction confirms the ceiling is the recipe, not
+the head design.
+
 ## Reproduce
 
 ```bash
