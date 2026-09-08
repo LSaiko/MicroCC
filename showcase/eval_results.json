@@ -1,0 +1,15 @@
+{
+  "model": "runs/detect/runs/bbbc0396/weights/best.pt",
+  "split": "val",
+  "n_images": 40,
+  "conf": 0.5,
+  "iou": 0.6,
+  "imgsz": 1280,
+  "mAP50": 0.9792,
+  "mAP50_95": 0.8198,
+  "count_MAE": 3.2,
+  "count_MAPE_pct": 3.18,
+  "gt_total": 3990,
+  "pred_total": 4074,
+  "bias_pred_minus_gt": 84
+}

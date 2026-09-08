@@ -1,0 +1,18 @@
+# data (download from BBBC039)
+Img/
+mask/
+dataset/
+labels/
+__MACOSX/
+*.zip
+
+# model weights & training runs (regenerate via bbbc039/train.py)
+*.pt
+runs/
+!showcase/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
