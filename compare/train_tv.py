@@ -23,13 +23,16 @@ MODELS = {
 }
 
 
-def build(name):
+def build(name, imgsz=None):
     import functools
 
     import torchvision.models.detection as det
     fn_name, w_name = MODELS[name]
     weights = getattr(det, w_name).COCO_V1
     model = getattr(det, fn_name)(weights=weights, num_classes=91)
+    if imgsz:  # match a target input resolution (default recipe is min_size=800)
+        model.transform.min_size = (imgsz,)
+        model.transform.max_size = imgsz
     # swap classification head for 2 classes (bg + cell)
     if name == "fasterrcnn":
         from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
@@ -69,12 +72,15 @@ def main():
     ap.add_argument("--data", default="dataset")
     ap.add_argument("--epochs", type=int, default=40)
     ap.add_argument("--batch", type=int, default=2)
+    ap.add_argument("--accum", type=int, default=1, help="gradient accumulation steps")
+    ap.add_argument("--imgsz", type=int, default=0, help="0 = torchvision default (~800)")
+    ap.add_argument("--tag", default="", help="output dir suffix, e.g. '1280'")
     ap.add_argument("--lr", type=float, default=5e-3)
     ap.add_argument("--device", default="cuda")
     args = ap.parse_args()
 
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
-    out = pathlib.Path("compare/runs") / args.model
+    out = pathlib.Path("compare/runs") / (args.model + (f"_{args.tag}" if args.tag else ""))
     out.mkdir(parents=True, exist_ok=True)
 
     tr = YoloDetectionDataset(args.data, "train", train=True)
@@ -84,7 +90,7 @@ def main():
     vl = torch.utils.data.DataLoader(va, batch_size=args.batch, shuffle=False,
                                      num_workers=0, collate_fn=collate_fn)
 
-    model = build(args.model).to(device)
+    model = build(args.model, args.imgsz or None).to(device)
     opt = torch.optim.SGD([p for p in model.parameters() if p.requires_grad],
                           lr=args.lr, momentum=0.9, weight_decay=5e-4)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, args.epochs)
@@ -94,19 +100,21 @@ def main():
     for epoch in range(1, args.epochs + 1):
         model.train()
         running = 0.0
-        for imgs, targets in tl:
+        opt.zero_grad()
+        for step, (imgs, targets) in enumerate(tl):
             imgs = [i.to(device) for i in imgs]
             targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-            opt.zero_grad()
             with torch.amp.autocast("cuda", enabled=device.type == "cuda"):
                 losses = model(imgs, targets)
-                loss = sum(losses.values())
+                loss = sum(losses.values()) / args.accum
             scaler.scale(loss).backward()
-            scaler.unscale_(opt)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
-            scaler.step(opt)
-            scaler.update()
-            running += loss.item()
+            running += loss.item() * args.accum
+            if (step + 1) % args.accum == 0:
+                scaler.unscale_(opt)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+                scaler.step(opt)
+                scaler.update()
+                opt.zero_grad()
         sched.step()
 
         map50, map5095 = evaluate(model, vl, device)
@@ -115,8 +123,8 @@ def main():
         if map50 > best:
             best = map50
             torch.save({"model": args.model, "state_dict": model.state_dict(),
-                        "map50": map50, "map5095": map5095, "epoch": epoch},
-                       out / "best.pt")
+                        "imgsz": args.imgsz, "map50": map50,
+                        "map5095": map5095, "epoch": epoch}, out / "best.pt")
     print(f"done. best mAP@50 {best:.4f} -> {out / 'best.pt'}")
 
 

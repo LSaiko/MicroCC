@@ -9,7 +9,7 @@
     "best_conf": 0.5,
     "count_MAE@best": 3.2,
     "count_MAPE@best_pct": 3.18,
-    "ms_per_image": 35.0
+    "ms_per_image": 34.4
   },
   "RT-DETR-L": {
     "mAP50": 0.9672,
@@ -21,42 +21,78 @@
     "best_conf": 0.7,
     "count_MAE@best": 2.45,
     "count_MAPE@best_pct": 2.52,
-    "ms_per_image": 55.5
+    "ms_per_image": 56.2
   },
   "Faster R-CNN": {
-    "mAP50": 0.839,
-    "mAP75": 0.8366,
-    "mAR500": 0.785,
-    "count_MAE@0.5": 14.8,
-    "count_MAPE@0.5_pct": 13.49,
-    "count_bias@0.5": -430,
+    "mAP50": 0.9676,
+    "mAP75": 0.9545,
+    "mAR500": 0.903,
+    "count_MAE@0.5": 12.97,
+    "count_MAPE@0.5_pct": 12.46,
+    "count_bias@0.5": 519,
     "best_conf": 0.8,
-    "count_MAE@best": 13.4,
-    "count_MAPE@best_pct": 11.32,
-    "ms_per_image": 89.6
+    "count_MAE@best": 2.88,
+    "count_MAPE@best_pct": 2.83,
+    "ms_per_image": 89.3
+  },
+  "Faster R-CNN @1280": {
+    "mAP50": 0.9761,
+    "mAP75": 0.9551,
+    "mAR500": 0.9,
+    "count_MAE@0.5": 12.82,
+    "count_MAPE@0.5_pct": 12.06,
+    "count_bias@0.5": 513,
+    "best_conf": 0.75,
+    "count_MAE@best": 3.0,
+    "count_MAPE@best_pct": 3.04,
+    "ms_per_image": 105.6
   },
   "RetinaNet": {
-    "mAP50": 0.8811,
-    "mAP75": 0.8606,
-    "mAR500": 0.8223,
-    "count_MAE@0.5": 17.93,
-    "count_MAPE@0.5_pct": 16.65,
-    "count_bias@0.5": -717,
-    "best_conf": 0.25,
-    "count_MAE@best": 3.45,
-    "count_MAPE@best_pct": 3.53,
-    "ms_per_image": 65.0
+    "mAP50": 0.9561,
+    "mAP75": 0.9347,
+    "mAR500": 0.8911,
+    "count_MAE@0.5": 6.6,
+    "count_MAPE@0.5_pct": 6.16,
+    "count_bias@0.5": -254,
+    "best_conf": 0.45,
+    "count_MAE@best": 2.6,
+    "count_MAPE@best_pct": 2.48,
+    "ms_per_image": 64.9
+  },
+  "RetinaNet @1280": {
+    "mAP50": 0.9547,
+    "mAP75": 0.9328,
+    "mAR500": 0.8885,
+    "count_MAE@0.5": 3.95,
+    "count_MAPE@0.5_pct": 3.95,
+    "count_bias@0.5": 138,
+    "best_conf": 0.55,
+    "count_MAE@best": 3.25,
+    "count_MAPE@best_pct": 3.18,
+    "ms_per_image": 80.0
   },
   "FCOS": {
-    "mAP50": 0.8384,
-    "mAP75": 0.8371,
-    "mAR500": 0.7956,
-    "count_MAE@0.5": 13.75,
-    "count_MAPE@0.5_pct": 11.96,
-    "count_bias@0.5": -530,
+    "mAP50": 0.9745,
+    "mAP75": 0.955,
+    "mAR500": 0.9207,
+    "count_MAE@0.5": 5.05,
+    "count_MAPE@0.5_pct": 4.89,
+    "count_bias@0.5": 130,
     "best_conf": 0.5,
-    "count_MAE@best": 13.75,
-    "count_MAPE@best_pct": 11.96,
-    "ms_per_image": 67.0
+    "count_MAE@best": 5.05,
+    "count_MAPE@best_pct": 4.89,
+    "ms_per_image": 69.0
+  },
+  "FCOS @1280": {
+    "mAP50": 0.9761,
+    "mAP75": 0.9593,
+    "mAR500": 0.9269,
+    "count_MAE@0.5": 12.8,
+    "count_MAPE@0.5_pct": 11.84,
+    "count_bias@0.5": 512,
+    "best_conf": 0.6,
+    "count_MAE@best": 3.17,
+    "count_MAPE@best_pct": 3.18,
+    "ms_per_image": 86.0
   }
 }

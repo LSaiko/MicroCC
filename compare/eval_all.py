@@ -48,15 +48,23 @@ def rtdetr_preds(weights, ds):
 
 def tv_preds(weights, ds, arch):
     from train_tv import build
-    ckpt = torch.load(weights, map_location=DEVICE)
-    model = build(arch).to(DEVICE)
+    ckpt = torch.load(weights, map_location=DEVICE, weights_only=False)
+    model = build(arch, ckpt.get("imgsz") or None).to(DEVICE)
     model.load_state_dict(ckpt["state_dict"])
     model.eval()
-    # lower the score floor so the mAP PR-curve isn't truncated (YOLO uses 0.001)
+    # Uncap every COCO-tuned per-image limit: the defaults (100-300 detections,
+    # 1000 pre-NMS candidates) are set for images with ~7 objects and silently
+    # throttle recall on fields of 100-165 nuclei. Also drop the score floor so
+    # the mAP PR-curve isn't truncated (YOLO uses 0.001).
     if arch == "fasterrcnn":
         model.roi_heads.score_thresh = 0.01
+        model.roi_heads.detections_per_img = 1000
+        model.rpn.post_nms_top_n_test = 3000
+        model.rpn.pre_nms_top_n_test = 6000
     else:
         model.score_thresh = 0.01
+        model.detections_per_img = 1000
+        model.topk_candidates = 3000
     with torch.no_grad():
         for i in range(len(ds)):
             img, _ = ds[i]
@@ -121,9 +129,10 @@ def main():
         jobs.append(("RT-DETR-L", lambda: rtdetr_preds(rtdetr_w, ds)))
     for arch, label in (("fasterrcnn", "Faster R-CNN"), ("retinanet", "RetinaNet"),
                         ("fcos", "FCOS")):
-        w = f"compare/runs/{arch}/best.pt"
-        if pathlib.Path(w).exists():
-            jobs.append((label, (lambda a=arch, ww=w: tv_preds(ww, ds, a))))
+        for w in sorted(glob.glob(f"compare/runs/{arch}*/best.pt")):
+            suffix = pathlib.Path(w).parent.name.replace(arch, "").lstrip("_")
+            lbl = f"{label} @{suffix}" if suffix else label
+            jobs.append((lbl, (lambda a=arch, ww=w: tv_preds(ww, ds, a))))
 
     results = {}
     for label, fn in jobs:

@@ -40,90 +40,97 @@ More predictions: [showcase/val_predictions_2.jpg](showcase/val_predictions_2.jp
 ### vs. other detectors
 
 RT-DETR-L, RetinaNet, FCOS and Faster R-CNN trained on the same split, scored
-through one torchmetrics harness:
+through one torchmetrics harness. **All per-image detection caps raised** (see
+significance) — the torchvision models were re-trained at 1280 px too:
 
-| Model | mAP@50 | mAR@500 | count MAE (tuned) | ms/img |
-|---|---|---|---|---|
-| **YOLOv8s** | **0.969** | 0.786 | 3.2 | **35** |
-| RT-DETR-L | 0.967 | **0.910** | **2.5** | 55 |
-| RetinaNet | 0.881 | 0.822 | 3.5 | 65 |
-| FCOS | 0.838 | 0.796 | 13.8 | 67 |
-| Faster R-CNN | 0.839 | 0.785 | 13.4 | 90 |
+| Model | mAP@50 | mAP@75 | mAR@500 | count MAE (tuned) | ms/img |
+|---|---|---|---|---|---|
+| Faster R-CNN @1280 | **0.976** | 0.955 | 0.900 | 3.0 | 106 |
+| FCOS @1280 | **0.976** | **0.959** | **0.927** | 3.2 | 86 |
+| **YOLOv8s** @1280 | 0.969 | 0.931 | 0.786 | 3.2 | **34** |
+| Faster R-CNN @800 | 0.968 | 0.955 | 0.903 | 2.9 | 89 |
+| RT-DETR-L @960 | 0.967 | 0.935 | 0.910 | 2.5 | 56 |
+| RetinaNet @800 | 0.956 | 0.935 | 0.891 | 2.6 | 65 |
+| RetinaNet @1280 | 0.955 | 0.933 | 0.888 | 3.3 | 80 |
+
+With **COCO-default caps** the same torchvision checkpoints score Faster R-CNN
+0.839 / FCOS 0.838 / RetinaNet 0.881 — which is what earlier versions of this
+README reported before the fair-resolution rematch exposed the cause.
 
 ![model comparison](showcase/model_comparison.png)
 
-#### Significance (for these 5 models, as configured)
+#### Significance
 
-- **Resolution beats architecture.** The ~10-pt mAP gap between the two groups is
-  input size (1280/960 vs ~800), not RPN vs. dense vs. transformer. Fix
-  resolution/tiling *before* comparing model families.
-- **mAP@50 doesn't rank counting accuracy.** FCOS and Faster R-CNN have identical
-  mAP yet miss 13–14 nuclei/image; RetinaNet's mAP is mediocre but it counts
-  fine once tuned. Read the count-MAE column for this task.
-- **Confidence calibration is per-model.** Best counting threshold: 0.70
-  RT-DETR / 0.50 YOLO / 0.25 RetinaNet — a 3× spread. Hard-coding `conf=0.5`
-  from a YOLO tutorial and swapping in RetinaNet silently under-counts ~18 %.
-- **NMS-free helps dense fields.** RT-DETR's mAR@500 0.910 vs. everyone else's
-  ~0.80: NMS deletes a box overlapping a higher-scoring one, and confluent
-  nuclei overlap, so NMS discards correct detections. RT-DETR's set loss runs no
-  NMS. This is the exact failure mode "detection over segmentation" exists to
-  dodge.
-- **Two-stage doesn't pay off here.** Faster R-CNN is the biggest and slowest and
-  worst: its RPN proposal budget spreads thin over 100+ near-identical objects,
-  capping recall before stage two runs.
+- **The per-image detection cap is the dominant lever — not architecture, not
+  resolution.** torchvision detectors default to `detections_per_img` 100–300 and
+  `topk_candidates` 1000, values set for COCO (≈7 objects/image). On fields of
+  100–165 nuclei they silently clip recall. Raising them (three config lines)
+  lifts Faster R-CNN 0.839 → 0.968 and FCOS 0.838 → 0.975 on the *same weights,
+  same resolution* — a +0.13 swing. **Audit every `*_per_img` / `*_top_n` /
+  `max_det` before comparing models on a dense-detection task.**
+- **With caps raised, architecture barely matters here.** Two-stage,
+  anchor-based, anchor-free FCN, anchor-free YOLO, and a transformer all land in
+  mAP@50 0.955–0.976 — a 0.02 spread, within noise on a 40-image val set.
+- **Resolution 800 → 1280 is minor** (~+0.01 mAP@50) but does tighten FCOS's
+  boxes enough to halve its count MAE (5.1 → 3.2).
+- **mAP@50 still doesn't rank the counting.** FCOS @800 is 3rd on mAP, worst on
+  tuned count MAE; RetinaNet @800 is near-last on mAP, ties for best count MAE.
+  Read the count column for a counting deployment.
+- **Confidence calibration is per-model** — optimal counting conf 0.45–0.80
+  across models. A pipeline that hard-codes `conf=0.5` from a YOLO tutorial and
+  swaps in another detector counts wrong.
+- **YOLOv8s now has the *lowest* recall of the five** (mAR 0.786). Its edge is
+  latency (34 ms, 1.6–3× faster) and a one-package workflow, not accuracy.
 
 #### Which model to use
 
 | If you need… | Pick | Caveat |
 |---|---|---|
-| Lowest latency, simplest stack | **YOLOv8s** | counting tied with RT-DETR only *after* conf tuning; lower raw recall |
-| Best accuracy / recall / tightest boxes; crowded or confluent fields | **RT-DETR-L** | 1.6× slower (55 ms), 3× the params, needs conf ≈ 0.70, 960 px = 7 GB VRAM |
-| Already committed to a `torchvision` pipeline | **RetinaNet** | only if retrained at ≥1024 px; must set conf ≈ 0.25 |
-| — | ~~FCOS / Faster R-CNN~~ | dominated on every axis at this resolution; no reason to choose them here |
+| Lowest latency, single-package workflow | **YOLOv8s** | lowest recall of the five; fine for well-separated nuclei, weakest on confluent fields |
+| Highest recall on crowded/confluent fields | **FCOS @1280** or **RT-DETR-L** | 2.5–3× YOLO's latency; FCOS needs its detection caps raised, RT-DETR needs 960 px / 7 GB |
+| Best tuned count MAE | **RT-DETR-L** (2.5) / **RetinaNet @800** (2.6) | both need per-model conf (0.70 / 0.45) |
+| A `torchvision`-only stack | **Faster R-CNN** or **FCOS** | competitive *only* with `detections_per_img`/`topk_candidates` raised well above your max object count |
 
 #### Capacity vs. hardware (measured on RTX 5060, 8 GB)
 
 | Model | Params | Train config that fits 8 GB | Peak VRAM (train) | Infer ms/img¹ | Train time |
 |---|---|---|---|---|---|
-| YOLOv8s | 11 M | 1280 px, batch 4 | 5.4 GB (measured) | 35 | ~15 min (best @ ep 43) |
-| RT-DETR-L | 32 M | **960 px**, batch 4 (1280 OOMs) | 7.1 GB (measured) | 55 | ~20 min (converged ep 47) |
-| RetinaNet | 36 M | ~800 px, batch 2 | ~5 GB (est.) | 65 | ~25 min (40 ep) |
-| FCOS | 32 M | ~800 px, batch 2 | ~5 GB (est.) | 67 | ~100 min (40 ep, slow head) |
-| Faster R-CNN | 43 M | ~800 px, batch 2 | ~5 GB (est.) | 90 | ~25 min (40 ep) |
+| YOLOv8s | 11 M | 1280 px, batch 4 | 5.4 GB (measured) | 34 | ~15 min (best @ ep 43) |
+| RT-DETR-L | 32 M | **960 px**, batch 4 (1280 OOMs) | 7.1 GB (measured) | 56 | ~20 min (converged ep 47) |
+| RetinaNet | 36 M | 1280 px, batch 2 | ~3 GB | 65–80 | ~25 min (40 ep @800) |
+| FCOS | 32 M | 1280 px, batch 2 | ~3 GB | 69–86 | ~100 min @800, ~2× @1280 (slow head) |
+| Faster R-CNN | 43 M | 1280 px, batch 2 | ~3 GB | 89–106 | ~25 min (40 ep @800) |
 
-¹ YOLO's figure includes image load from disk; the torchvision models were handed
-pre-loaded tensors, so YOLO's real inference margin over them is larger. The P2
-(stride-4) YOLO variant OOMs at ≥640 px on 8 GB — not in this table for that
-reason.
+¹ range is @800 → @1280. YOLO's figure includes image load from disk; the
+torchvision models were handed pre-loaded tensors, so YOLO's real inference
+margin over them is larger. torchvision VRAM is a fwd+bwd smoke-test estimate
+(batch-1 peaked ~2.2 GB at 1280 px); the P2 (stride-4) YOLO variant OOMs at
+≥640 px on 8 GB.
 
-Practical reading: on an **8 GB** card only YOLOv8s trains at full 1280 px; RT-DETR
-needs 960 and the P2-head YOLO variant does not fit at all. On **≤4 GB**, drop to
-640 px / batch 2 (expect the mAP hit from finding 1). On **≥16 GB**, RT-DETR at
-1280 px and larger batches is the obvious next experiment (see below). CPU-only
-inference is viable for one-off counts (~1–3 s/image at 1280) but not for
-batches.
+Practical reading: **VRAM is not the constraint** for the torchvision models —
+they'd fit a 4 GB card at 1280 px / batch 2. YOLO (5.4 GB) and RT-DETR (7.1 GB)
+are the memory-hungry ones. On **≥16 GB**, RT-DETR at 1280 px + larger batch is
+the obvious next experiment. CPU-only inference is viable for one-off counts
+(~1–3 s/image) but not batches.
 
 #### Proposed future studies
 
-1. **Fair-resolution rematch.** Retrain Faster R-CNN / RetinaNet / FCOS at
-   1280 px (`min_size=1280`) to isolate architecture from input size — finding 1
-   predicts they close most of the gap; confirm and quantify.
+1. ~~**Fair-resolution rematch.**~~ ✅ Done — see the correction above. Resolution
+   was *not* the lever; the per-image detection cap was.
 2. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU — does it pull clear of
-   YOLO on mAP@50, not just recall?
+   the pack, or is the 0.97 plateau real?
 3. **Detection vs. segmentation baseline.** Add Cellpose / StarDist (the
    bioimaging-standard instance-segmentation tools) and compare count MAE — the
    comparison the task framing implies but this study skipped.
-4. **Tiling (SAHI) instead of big inputs** — 512 px tiles at 20 % overlap on the
-   torchvision nets; cheaper than 1280 px full-frame, may recover the gap on
-   modest hardware.
+4. **Tiling (SAHI)** — 512 px tiles at 20 % overlap; may lift recall further on
+   the densest fields without a resolution increase.
 5. **Cross-dataset generalisation.** Train on BBBC039, evaluate zero-shot on
-   BBBC038 / DSB2018 — does RT-DETR's NMS-free recall advantage survive a domain
-   shift, or is it overfit to this nucleus density?
-6. **Count-calibrated training.** Add a count-consistency loss or a learned
-   per-image threshold, so the model optimises the deployed metric directly
-   instead of relying on a post-hoc conf sweep.
+   BBBC038 / DSB2018 — does the 0.97 cluster survive a domain shift?
+6. **Count-calibrated training.** A count-consistency loss or learned per-image
+   threshold, so the model optimises the deployed metric directly instead of a
+   post-hoc conf sweep.
 
-Full study and per-model detail: [compare/RESULTS.md](compare/RESULTS.md).
+Full study, correction, and per-model detail: [compare/RESULTS.md](compare/RESULTS.md).
 
 ![training curves](showcase/training_curves.png)
 ![precision-recall](showcase/pr_curve.png)
