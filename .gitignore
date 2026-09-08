@@ -16,3 +16,7 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+labels_v1/
+*_gtv1.json
+*_round2.json

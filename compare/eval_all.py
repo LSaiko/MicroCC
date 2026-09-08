@@ -73,18 +73,15 @@ def tv_preds(weights, ds, arch):
 
 
 def pr_f1_at_iou(pred_boxes, gt_boxes, thr=0.5):
-    """greedy 1-to-1 matching, IoU >= thr -> (precision, recall, f1)."""
+    """optimal (Hungarian) 1-to-1 matching, IoU >= thr -> (precision, recall, f1)."""
     if len(pred_boxes) == 0 or len(gt_boxes) == 0:
         return 0.0, 0.0, 0.0
+    from scipy.optimize import linear_sum_assignment
     from torchvision.ops import box_iou
     iou = box_iou(torch.as_tensor(pred_boxes, dtype=torch.float32),
                   torch.as_tensor(gt_boxes, dtype=torch.float32)).numpy()
-    matched, tp = set(), 0
-    for pi in np.argsort(-iou.max(axis=1)):
-        gi = int(iou[pi].argmax())
-        if iou[pi, gi] >= thr and gi not in matched:
-            matched.add(gi)
-            tp += 1
+    ri, ci = linear_sum_assignment(-iou)
+    tp = int((iou[ri, ci] >= thr).sum())
     prec, rec = tp / len(pred_boxes), tp / len(gt_boxes)
     f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
     return prec, rec, f1

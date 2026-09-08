@@ -28,7 +28,7 @@ def main():
     ap.add_argument("--model", required=True)
     ap.add_argument("--data", required=True, type=pathlib.Path)
     ap.add_argument("--split", default="val")
-    ap.add_argument("--conf", type=float, default=0.5)   # conf sweep: MAE minimises near 0.5-0.55
+    ap.add_argument("--conf", type=float, default=0.4)   # conf sweep on the watershed GT minimises here
     ap.add_argument("--iou", type=float, default=0.6)
     ap.add_argument("--imgsz", type=int, default=640)
     ap.add_argument("--json", type=pathlib.Path, default=pathlib.Path("results.json"))

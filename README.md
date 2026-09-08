@@ -15,18 +15,19 @@ Trained and evaluated on [BBBC039](https://bbbc.broadinstitute.org/BBBC039)
 
 ## Results
 
-`yolov8s`, 1280 px, best checkpoint (epoch 43), evaluated on the 40-image val split at conf 0.5:
+`yolov8s`, 1280 px, evaluated on the 40-image val split at conf 0.4:
 
 | Metric | Value |
 |---|---|
-| mAP@50 | **0.979** |
-| mAP@50:95 | **0.820** |
-| Count MAE | **3.2** nuclei/image |
-| Count MAPE | **3.2 %** |
-| Count bias (pred − gt) | +84 over 3990 |
+| mAP@50 | **0.980** |
+| mAP@50:95 | **0.821** |
+| Count MAE | **1.8** nuclei/image |
+| Count MAPE | **2.1 %** |
+| Count bias (pred − gt) | −5 over 3853 |
 
 Baseline `yolov8s` at 640 px / default aug reached only mAP@50 0.55 — see
-[Tuning](#tuning) for what moved it.
+[Tuning](#tuning) for what moved it. (Count MAE improved from 3.2 → 1.8 when the
+GT boxes were rebuilt with watershed instances — see the study below.)
 
 Predicted boxes (left) vs. ground truth (right) on a val batch:
 
@@ -39,91 +40,76 @@ More predictions: [showcase/val_predictions_2.jpg](showcase/val_predictions_2.jp
 
 ### vs. other detectors
 
-RT-DETR-L, RetinaNet, FCOS and Faster R-CNN trained on the same split; a
-fine-tuned Cellpose too. One harness. **All per-image detection caps raised**
-(see significance). Sorted by count MAE — the task metric. **F1@0.5** is
-precision/recall at IoU 0.5 evaluated at each model's *tuned confidence* — the
-one number comparable across detection and segmentation.
+RT-DETR-L, RetinaNet, FCOS, Faster R-CNN and a fine-tuned Cellpose, trained on
+the same split, one harness. **F1@0.5** = precision/recall at IoU 0.5 (optimal
+matching) at each model's *tuned confidence* — the deployed operating point, and
+the one number comparable across detection and segmentation.
 
-| Model | F1@0.5 | mAP@50 | mAR@500 | count MAE (tuned) | ms/img |
+| Model | F1@0.5 | mAP@50 | best conf | count MAE (tuned) | ms/img |
 |---|---|---|---|---|---|
-| Cellpose (fine-tuned) | 0.880 | 0.85¹ | 0.71 | **2.35** | 259 |
-| RT-DETR-L @960 | 0.881 | 0.967 | 0.910 | 2.45 | 56 |
-| RetinaNet @800 | 0.879 | 0.956 | 0.891 | 2.6 | 65 |
-| Faster R-CNN @800 | 0.882 | 0.968 | 0.903 | 2.9 | 89 |
-| Faster R-CNN @1280 | **0.883** | **0.976** | 0.900 | 3.0 | 106 |
-| FCOS @1280 | 0.881 | **0.976** | **0.927** | 3.2 | 86 |
-| **YOLOv8s** @1280 | 0.876 | 0.969 | 0.786 | 3.2 | **34** |
-| RetinaNet @1280 | 0.873 | 0.955 | 0.888 | 3.3 | 81 |
-| FCOS @800 | **0.883** | 0.975 | 0.921 | 5.1 | 70 |
-| Cellpose (zero-shot) | 0.869 | 0.84¹ | 0.78 | 12.6 | 493 |
+| RT-DETR-L | 0.898 | 0.960 | 0.70 | **1.52** | 51 |
+| **YOLOv8s** | 0.899 | 0.975 | 0.40 | 1.82 | **33** |
+| Faster R-CNN | 0.899 | 0.962 | 0.70 | 1.95 | 86 |
+| Cellpose (fine-tuned) | **0.903** | 0.90¹ | — | 2.27 | 240 |
+| FCOS | 0.895 | **0.977** | 0.50 | 2.38 | 67 |
+| RetinaNet | 0.889 | 0.950 | 0.50 | 2.58 | 65 |
+| Cellpose (zero-shot) | 0.781 | 0.67¹ | — | 16.1 | 452 |
 
 ¹ Cellpose has no per-object score — its single operating point, not comparable
-to the detectors' swept mAP. With **COCO-default caps** the torchvision
-checkpoints score Faster R-CNN 0.839 / FCOS 0.838 / RetinaNet 0.881 — what
-earlier README versions reported before the rematch exposed the cause.
+to the detectors' swept mAP.
 
 ![model comparison](showcase/model_comparison.png)
 
 #### Significance
 
-- **The per-image detection cap is the dominant lever — not architecture, not
-  resolution.** torchvision detectors default to `detections_per_img` 100–300 and
-  `topk_candidates` 1000, values set for COCO (≈7 objects/image). On fields of
-  100–165 nuclei they silently clip recall. Raising them (three config lines)
-  lifts Faster R-CNN 0.839 → 0.968 and FCOS 0.838 → 0.975 on the *same weights,
-  same resolution* — a +0.13 swing. **Audit every `*_per_img` / `*_top_n` /
-  `max_det` before comparing models on a dense-detection task.**
-- **With caps raised, architecture barely matters here.** Two-stage,
-  anchor-based, anchor-free FCN, anchor-free YOLO, and a transformer all land in
-  mAP@50 0.955–0.976 — a 0.02 spread, within noise on a 40-image val set.
-- **At tuned operating points every model converges to F1@0.5 ≈ 0.88** — all
-  eight detector configs *and* fine-tuned Cellpose (0.873–0.883). The 0.96–0.98
-  mAP describes the PR curve, not the deployed point. Models separate on **count
-  MAE and speed**, not detection F1. (The ~0.88 ceiling is likely the mask→box
-  GT conversion as much as the models.)
-- **Resolution 800 → 1280 is minor** (~+0.01 mAP@50) but does tighten FCOS's
-  boxes enough to halve its count MAE (5.1 → 3.2).
-- **mAP@50 still doesn't rank the counting.** FCOS @800 is 3rd on mAP, worst on
-  tuned count MAE; RetinaNet @800 is near-last on mAP, ties for best count MAE.
-  Read the count column for a counting deployment.
-- **Confidence calibration is per-model** — optimal counting conf 0.45–0.80
-  across models. A pipeline that hard-codes `conf=0.5` from a YOLO tutorial and
-  swaps in another detector counts wrong.
-- **YOLOv8s now has the *lowest* recall of the five** (mAR 0.786). Its edge is
-  latency (34 ms, 1.6–3× faster) and a one-package workflow, not accuracy.
-- **Zero-shot Cellpose loses badly (count MAE 12.6) — fine-tuned it wins.**
-  Fine-tuned on the same 158 images the detectors saw (~9 min), Cellpose posts
-  count MAE **2.35** (best in the study, essentially unbiased), F1@0.5 0.880
-  (tied with the detectors), and a per-nucleus instance mask for free. Cost:
-  4–8× the detectors' latency (259 ms). "Detection beats segmentation" was a
-  benchmarking artifact of testing a pretrained model out of domain.
+- **Architecture is not the lever.** Six trained models — two-stage,
+  anchor-based, anchor-free FCN, YOLO, transformer, and fine-tuned segmentation —
+  span F1@0.5 0.889–0.903 and count MAE 1.5–2.6. They separate on **speed** and
+  on whether you need instance masks, not on detection quality.
+- **The per-image detection cap decides it.** torchvision defaults
+  (`detections_per_img` 100–300, `topk_candidates` 1000) are set for COCO's ~7
+  objects/image and clip recall on fields of 100–165 nuclei. Raising them lifts
+  Faster R-CNN mAP@50 0.84 → 0.96 and FCOS 0.84 → 0.98 on the *same weights*.
+  **Audit every `*_per_img` / `*_top_n` / `max_det` before benchmarking a dense
+  task.**
+- **mAP@50 doesn't rank the counting.** FCOS tops mAP@50 (0.977) with a middling
+  count MAE (2.38); RT-DETR is 5th on mAP@50, 1st on count MAE (1.52). Read the
+  count column.
+- **Confidence calibration is per-model** (optimal 0.40–0.70). Hard-coding
+  `conf=0.5` and swapping detectors counts wrong.
+- **Zero-shot ≠ the ceiling.** Off-the-shelf Cellpose (F1 0.78, count MAE 16)
+  looked like a paradigm loss; fine-tuned on the same 158 images it posts the
+  **best F1@0.5 of any model (0.903)**. "Detection beats segmentation" was an
+  out-of-domain artifact.
+- **Three corrections, each bigger than swapping models:** the detection cap
+  (correction 1), the resolution assumption (correction 2, ~+0.01 only), and the
+  mask→box GT — rebuilt with watershed instances + a size filter, which lifted
+  the F1 ceiling ~0.88 → ~0.90 and dropped count MAE ~40 % across the board
+  (YOLO 3.2 → 1.8, RT-DETR 2.5 → 1.5). See [compare/RESULTS.md](compare/RESULTS.md).
 
 #### Which model to use
 
 | If you need… | Pick | Caveat |
 |---|---|---|
-| Lowest latency, single-package workflow | **YOLOv8s** | lowest recall of the detectors; fine for well-separated nuclei, weakest on confluent fields |
-| Lowest count error + per-nucleus masks | **fine-tuned Cellpose** (MAE 2.35) | 4–8× slower (259 ms); needs instance-label masks to train (built from BBBC039 semantic masks) |
-| Best count MAE among detectors | **RT-DETR-L** (2.5) / **RetinaNet @800** (2.6) | per-model conf (0.70 / 0.45); RT-DETR needs 960 px / 7 GB |
-| Highest detection recall on crowded fields | **FCOS @1280** or **RT-DETR-L** | 2.5–3× YOLO's latency; FCOS needs its detection caps raised |
-| A `torchvision`-only stack | **Faster R-CNN** or **FCOS** | competitive *only* with `detections_per_img`/`topk_candidates` raised well above your max object count |
+| Lowest latency, single-package workflow | **YOLOv8s** (33 ms) | conf ≈ 0.40 for counting |
+| Best count MAE among detectors | **RT-DETR-L** (1.52) | 960 px / 7 GB VRAM, conf ≈ 0.70 |
+| Lowest count error overall + per-nucleus masks | **fine-tuned Cellpose** (F1 0.903, MAE 2.27) | 4–7× slower (240 ms); trains on instance-label masks |
+| A `torchvision`-only stack | **Faster R-CNN** or **FCOS** | competitive *only* with `detections_per_img` / `topk_candidates` raised above your max object count |
 
 #### Capacity vs. hardware (measured on RTX 5060, 8 GB)
 
 | Model | Params | Train config that fits 8 GB | Peak VRAM (train) | Infer ms/img¹ | Train time |
 |---|---|---|---|---|---|
-| YOLOv8s | 11 M | 1280 px, batch 4 | 5.4 GB (measured) | 34 | ~15 min (best @ ep 43) |
-| RT-DETR-L | 32 M | **960 px**, batch 4 (1280 OOMs) | 7.1 GB (measured) | 56 | ~20 min (converged ep 47) |
-| RetinaNet | 36 M | 1280 px, batch 2 | ~3 GB | 65–80 | ~25 min (40 ep @800) |
-| FCOS | 32 M | 1280 px, batch 2 | ~3 GB | 69–86 | ~100 min @800, ~2× @1280 (slow head) |
-| Faster R-CNN | 43 M | 1280 px, batch 2 | ~3 GB | 89–106 | ~25 min (40 ep @800) |
+| YOLOv8s | 11 M | 1280 px, batch 4 | 5.4 GB | 33 | ~30 min (best @ ep 74) |
+| RT-DETR-L | 32 M | **960 px**, batch 4 (1280 OOMs) | 7.1 GB | 51 | ~30 min (best @ ep 48) |
+| RetinaNet | 36 M | 800 px, batch 2 | ~3 GB | 65 | ~25 min (40 ep) |
+| FCOS | 32 M | 800 px, batch 2 | ~3 GB | 67 | ~30 min (40 ep) |
+| Faster R-CNN | 43 M | 800 px, batch 2 | ~3 GB | 86 | ~25 min (40 ep) |
 
-¹ range is @800 → @1280. YOLO's figure includes image load from disk; the
-torchvision models were handed pre-loaded tensors, so YOLO's real inference
-margin over them is larger. torchvision VRAM is a fwd+bwd smoke-test estimate
-(batch-1 peaked ~2.2 GB at 1280 px); the P2 (stride-4) YOLO variant OOMs at
-≥640 px on 8 GB.
+¹ YOLO's figure includes image load from disk; the torchvision models were
+handed pre-loaded tensors, so YOLO's real inference margin over them is larger.
+torchvision VRAM is a fwd+bwd smoke-test estimate; the P2 (stride-4) YOLO
+variant OOMs at ≥640 px on 8 GB.
 
 Practical reading: **VRAM is not the constraint** for the torchvision models —
 they'd fit a 4 GB card at 1280 px / batch 2. YOLO (5.4 GB) and RT-DETR (7.1 GB)
@@ -133,24 +119,22 @@ the obvious next experiment. CPU-only inference is viable for one-off counts
 
 #### Proposed future studies
 
-1. ~~**Fair-resolution rematch.**~~ ✅ Done — see the correction above. Resolution
-   was *not* the lever; the per-image detection cap was.
-2. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU — does it pull clear of
-   the pack, or is the 0.97 plateau real?
-3. ~~**Detection vs. segmentation baseline.**~~ ✅ Done — zero-shot Cellpose
-   F1@0.5 0.87 / count MAE 12.6 (loses); **fine-tuned Cellpose count MAE 2.35**
-   (best in study), F1@0.5 tied with the detectors at their tuned conf. Open
-   follow-up: StarDist; a better mask→box GT (the ~0.88 F1 ceiling looks like a
-   GT-quality limit).
-4. **Tiling (SAHI)** — 512 px tiles at 20 % overlap; may lift recall further on
-   the densest fields without a resolution increase.
-5. **Cross-dataset generalisation.** Train on BBBC039, evaluate zero-shot on
-   BBBC038 / DSB2018 — does the 0.97 cluster survive a domain shift?
-6. **Count-calibrated training.** A count-consistency loss or learned per-image
-   threshold, so the model optimises the deployed metric directly instead of a
-   post-hoc conf sweep.
+1. ~~**Fair-resolution rematch.**~~ ✅ Resolution was not the lever — the
+   per-image detection cap was.
+2. ~~**Detection vs. segmentation baseline.**~~ ✅ Fine-tuned Cellpose ties/leads
+   the detectors (F1 0.903); zero-shot loses.
+3. ~~**Improve the mask→box GT.**~~ ✅ Watershed instances + size filter +
+   Hungarian matching. F1 ceiling ~0.88 → ~0.90; count MAE dropped ~40 %.
+4. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU.
+5. **Tiling (SAHI)** — 512 px tiles, 20 % overlap; may lift recall on the
+   densest fields without more resolution.
+6. **Cross-dataset generalisation** — train BBBC039, test zero-shot on
+   BBBC038 / DSB2018.
+7. **Count-calibrated training** — a count-consistency loss or learned per-image
+   threshold, so the model optimises the deployed metric directly.
+8. **StarDist** as a second segmentation baseline.
 
-Full study, correction, and per-model detail: [compare/RESULTS.md](compare/RESULTS.md).
+Full study, corrections, and per-model detail: [compare/RESULTS.md](compare/RESULTS.md).
 
 ![training curves](showcase/training_curves.png)
 ![precision-recall](showcase/pr_curve.png)
@@ -158,8 +142,9 @@ Full study, correction, and per-model detail: [compare/RESULTS.md](compare/RESUL
 ## Setup
 
 ```bash
-pip install ultralytics opencv-python-headless numpy pyyaml
+pip install ultralytics opencv-python-headless numpy pyyaml scipy scikit-image
 ```
+(`scipy` + `scikit-image` are for the watershed GT construction.)
 
 Download the dataset from https://bbbc.broadinstitute.org/BBBC039 (images +
 masks + metadata) and unzip so you have a folder of `*.tif` images and a folder
@@ -168,8 +153,8 @@ of `*.png` masks.
 ## Pipeline
 
 ```bash
-# 1. masks -> YOLO bbox labels (handles BBBC039's interior/boundary semantic masks,
-#    instance-labelled masks, and plain binary masks; empty masks -> empty .txt)
+# 1. masks -> YOLO bbox labels (watershed instances from BBBC039's interior/boundary
+#    semantic masks; also handles instance-labelled and binary masks; empty -> empty .txt)
 python bbbc039/masks_to_yolo.py --images Img/images --masks mask/masks --out labels
 
 # 2. build the YOLO dataset: 3-channel PNGs + train/val split + dataset.yaml
@@ -202,7 +187,8 @@ Small objects (~20×20 px nuclei) on an 8 GB GPU:
 - **`hsv_h=0`, low `hsv_s/hsv_v`** — fluorescence is effectively single-channel; hue jitter is noise.
 - **`box=8.5`** — weight localisation over classification (only one class).
 - The P2 (stride-4) head helps in theory but OOMs at ≥640 px on 8 GB with ~100 objects/image; plain `yolov8s` at 1280 is the affordable equivalent.
-- **Counting**: the model over-predicts at conf 0.25 (+16 %). A conf sweep on val minimises MAE near **conf 0.5–0.55** — `evaluate.py` defaults to 0.5.
+- **Counting**: sweep conf on val — MAE minimises near **conf 0.4** with the
+  watershed GT (bias −5 over 3853). `evaluate.py` defaults to 0.5; pass `--conf 0.4`.
 
 ## Notes
 
