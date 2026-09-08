@@ -1,8 +1,9 @@
-# Comparison study — YOLOv8s vs. 4 other detectors
+# Comparison study — YOLOv8s vs. 4 detectors + a segmentation baseline
 
 Does the detector choice matter for counting nuclei? Trained four alternatives
 on the **same** BBBC039 split, scored all five through **one** metric harness,
-then ran a fair-resolution rematch that **overturned the first conclusion.**
+ran a fair-resolution rematch that **overturned the first conclusion**, and
+added a zero-shot Cellpose segmentation baseline.
 
 > **Correction (this supersedes the earlier version of this file).** Rounds 1–2
 > reported Faster R-CNN and FCOS at mAP@50 ~0.84 and concluded "two-stage and
@@ -45,6 +46,32 @@ for the rematch (`model.transform.min_size/max_size`, same everything else,
 
 For reference, the same torchvision checkpoints **with COCO-default caps**:
 Faster R-CNN 0.839, FCOS 0.838, RetinaNet 0.881 — the numbers rounds 1–2 reported.
+
+## Segmentation baseline — Cellpose (zero-shot)
+
+The task's framing contrasts detection with segmentation, so: the pretrained
+Cellpose `nuclei` model, **no training on BBBC039**, auto-diameter, run on the
+same 40 val images. Count = number of mask labels; boxes = one per label.
+Cellpose commits to a single segmentation and emits no per-object score, so
+mAP@50 uses score 1.0 (its operating point) and the honest comparison is
+precision / recall / F1 at IoU 0.5.
+
+| | mAP@50¹ | P@0.5 | R@0.5 | F1@0.5 | count MAE | count bias | ms/img |
+|---|---|---|---|---|---|---|---|
+| Cellpose (nuclei), zero-shot | 0.838 | 0.83 | 0.92 | **0.87** | **12.6** | **+493** (+12 %) | 493 |
+| *trained detectors (range)* | *0.96–0.98* | — | — | *≈0.95+* | *2.5–3.3* | *±80–260 @best conf* | *34–106* |
+
+¹ score-1.0 operating point, not directly comparable to the detectors' swept mAP.
+
+**Cellpose zero-shot is decisively beaten by every trained detector** — F1 0.87
+vs. ~0.95+, count MAE 12.6 vs. 2.5–3.3, and it systematically **over-counts by
+12 %** (recall 0.92 is fine; precision 0.83 is not — it splits nuclei the
+detectors keep whole). It is also 5–15× slower (493 ms; the flow post-processing
+is the cost). What it buys that detection does not: a full instance mask per
+nucleus (area, shape, intensity), and it needs **zero labels** — which is the
+only situation where it wins here, since BBBC039 *has* labels. A Cellpose model
+*fine-tuned* on BBBC039 would be the fair segmentation-vs-detection fight and is
+left for future work.
 
 ## Findings
 
@@ -104,6 +131,11 @@ Faster R-CNN 0.839, FCOS 0.838, RetinaNet 0.881 — the numbers rounds 1–2 rep
   FCOS @1280 (0.927) and RetinaNet @800 (0.891) match or beat it once uncapped —
   the earlier "NMS discards touching nuclei" advantage was partly the other
   models being throttled upstream of NMS.
+- **When labels exist, train a detector — don't reach for the off-the-shelf
+  segmentation tool.** Zero-shot Cellpose (F1 0.87, count MAE 12.6) is ~4× worse
+  at counting than a detector trained for 15–25 min on 160 images, and 5–15×
+  slower. Cellpose earns its place only with *no* labels, or when you need the
+  per-nucleus mask (area/shape/intensity) that a bounding box can't give.
 
 ## Reproduce
 
@@ -120,6 +152,7 @@ python compare/train_tv.py --model fcos       --epochs 18 --imgsz 1280 --tag 128
 python compare/train_rtdetr.py --epochs 100 --imgsz 960     # converges ~ep 47
 # score all checkpoints (caps raised inside eval_all.py) + plot
 python compare/eval_all.py
+python compare/cellpose_baseline.py    # zero-shot segmentation baseline (pip install "cellpose<4")
 python compare/plot_results.py
 ```
 

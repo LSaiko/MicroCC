@@ -52,10 +52,13 @@ significance) — the torchvision models were re-trained at 1280 px too:
 | RT-DETR-L @960 | 0.967 | 0.935 | 0.910 | 2.5 | 56 |
 | RetinaNet @800 | 0.956 | 0.935 | 0.891 | 2.6 | 65 |
 | RetinaNet @1280 | 0.955 | 0.933 | 0.888 | 3.3 | 80 |
+| *Cellpose `nuclei`, zero-shot* | *0.84¹* | — | — | *12.6* | *493* |
 
-With **COCO-default caps** the same torchvision checkpoints score Faster R-CNN
-0.839 / FCOS 0.838 / RetinaNet 0.881 — which is what earlier versions of this
-README reported before the fair-resolution rematch exposed the cause.
+¹ Cellpose has no per-object score, so this is its single operating point (F1@0.5
+= 0.87), not comparable to the detectors' swept mAP. With **COCO-default caps**
+the torchvision checkpoints score Faster R-CNN 0.839 / FCOS 0.838 / RetinaNet
+0.881 — what earlier versions of this README reported before the rematch exposed
+the cause.
 
 ![model comparison](showcase/model_comparison.png)
 
@@ -81,6 +84,10 @@ README reported before the fair-resolution rematch exposed the cause.
   swaps in another detector counts wrong.
 - **YOLOv8s now has the *lowest* recall of the five** (mAR 0.786). Its edge is
   latency (34 ms, 1.6–3× faster) and a one-package workflow, not accuracy.
+- **Zero-shot Cellpose (the domain-standard segmentation tool) loses badly** —
+  F1 0.87, count MAE 12.6, +12 % systematic over-count, 493 ms/image. A detector
+  trained 15–25 min on 160 labelled images is ~4× more accurate at counting.
+  Cellpose wins only when you have *no* labels or need per-nucleus masks.
 
 #### Which model to use
 
@@ -119,9 +126,10 @@ the obvious next experiment. CPU-only inference is viable for one-off counts
    was *not* the lever; the per-image detection cap was.
 2. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU — does it pull clear of
    the pack, or is the 0.97 plateau real?
-3. **Detection vs. segmentation baseline.** Add Cellpose / StarDist (the
-   bioimaging-standard instance-segmentation tools) and compare count MAE — the
-   comparison the task framing implies but this study skipped.
+3. ~~**Detection vs. segmentation baseline.**~~ ✅ Done — zero-shot Cellpose
+   `nuclei` scores F1@0.5 0.87 / count MAE 12.6, ~4× worse than the trained
+   detectors. Open follow-up: a Cellpose model *fine-tuned* on BBBC039 (the fair
+   trained-vs-trained fight); add StarDist.
 4. **Tiling (SAHI)** — 512 px tiles at 20 % overlap; may lift recall further on
    the densest fields without a resolution increase.
 5. **Cross-dataset generalisation.** Train on BBBC039, evaluate zero-shot on

@@ -21,6 +21,8 @@ for ax, (key, title, fmt) in zip(axes, [
     ax.set_yticklabels(models, fontsize=8)
     ax.invert_yaxis()
     ax.set_title(title, fontsize=10)
+    if key == "ms_per_image" and max(vals) / min(vals) > 8:
+        ax.set_xscale("log")
     for b, v in zip(bars, vals):
         ax.text(v, b.get_y() + b.get_height() / 2, " " + fmt.format(v),
                 va="center", fontsize=8)

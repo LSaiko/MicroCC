@@ -94,5 +94,20 @@
     "count_MAE@best": 3.17,
     "count_MAPE@best_pct": 3.18,
     "ms_per_image": 86.0
+  },
+  "Cellpose (nuclei)": {
+    "mAP50": 0.8376,
+    "mAP75": 0.7867,
+    "mAR500": 0.7761,
+    "P@0.5": 0.8282,
+    "R@0.5": 0.9168,
+    "F1@0.5": 0.8692,
+    "count_MAE@0.5": 12.62,
+    "count_MAPE@0.5_pct": 11.58,
+    "count_bias@0.5": 493,
+    "best_conf": null,
+    "count_MAE@best": 12.62,
+    "count_MAPE@best_pct": 11.58,
+    "ms_per_image": 492.7
   }
 }
