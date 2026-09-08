@@ -8,8 +8,10 @@ Saves best-by-val-mAP@50 weights to compare/runs/<model>/best.pt.
 """
 import argparse
 import pathlib
+import random
 import sys
 
+import numpy as np
 import torch
 from torchmetrics.detection import MeanAveragePrecision
 
@@ -75,9 +77,14 @@ def main():
     ap.add_argument("--accum", type=int, default=1, help="gradient accumulation steps")
     ap.add_argument("--imgsz", type=int, default=0, help="0 = torchvision default (~800)")
     ap.add_argument("--tag", default="", help="output dir suffix, e.g. '1280'")
+    ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--lr", type=float, default=5e-3)
     ap.add_argument("--device", default="cuda")
     args = ap.parse_args()
+
+    torch.manual_seed(args.seed)
+    random.seed(args.seed)
+    np.random.seed(args.seed)
 
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     out = pathlib.Path("compare/runs") / (args.model + (f"_{args.tag}" if args.tag else ""))

@@ -2,6 +2,7 @@
 Img/
 mask/
 dataset/
+dataset_official/
 labels/
 __MACOSX/
 *.zip

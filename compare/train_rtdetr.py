@@ -16,6 +16,9 @@ def main():
     ap.add_argument("--epochs", type=int, default=100)
     ap.add_argument("--imgsz", type=int, default=960)
     ap.add_argument("--batch", type=int, default=4)
+    ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--name", default="rtdetr")
+    ap.add_argument("--project", default="compare/runs")
     ap.add_argument("--device", default="0")
     args = ap.parse_args()
 
@@ -23,9 +26,10 @@ def main():
     model.train(
         data=args.data, epochs=args.epochs, imgsz=args.imgsz, batch=args.batch,
         device=args.device, workers=0, patience=40, cos_lr=True,
+        seed=args.seed, deterministic=True,
         scale=0.2, close_mosaic=20, mixup=0.0,
         hsv_h=0.0, hsv_s=0.2, hsv_v=0.3,
-        project="compare/runs", name="rtdetr",
+        project=args.project, name=args.name,
     )
 
 

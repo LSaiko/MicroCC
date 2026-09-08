@@ -19,6 +19,9 @@ def main():
     ap.add_argument("--imgsz", type=int, default=1280)
     ap.add_argument("--batch", type=int, default=4)
     ap.add_argument("--patience", type=int, default=60)
+    ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--name", default="bbbc039")
+    ap.add_argument("--project", default="runs")
     ap.add_argument("--device", default="0")
     args = ap.parse_args()
 
@@ -26,11 +29,12 @@ def main():
     model.train(
         data=args.data, epochs=args.epochs, imgsz=args.imgsz, batch=args.batch,
         device=args.device, workers=0, patience=args.patience, cos_lr=True, multi_scale=False,
+        seed=args.seed, deterministic=True,
         scale=0.2, close_mosaic=20, mixup=0.0, copy_paste=0.1,
         translate=0.1, degrees=15.0, fliplr=0.5, flipud=0.5,
         hsv_h=0.0, hsv_s=0.2, hsv_v=0.3,
         box=8.5, cls=0.3, dfl=1.5,
-        project="runs", name="bbbc039",
+        project=args.project, name=args.name,
     )
 
 

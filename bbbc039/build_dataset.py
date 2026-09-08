@@ -25,7 +25,8 @@ def fluoro_to_rgb(gray):
 
 def load_split_names(splits_dir):
     out = {}
-    for name, fn in (("train", "training.txt"), ("val", "validation.txt")):
+    for name, fn in (("train", "training.txt"), ("val", "validation.txt"),
+                     ("test", "test.txt")):
         p = splits_dir / fn
         if p.exists():
             out[name] = {pathlib.Path(l.strip()).stem for l in p.read_text().splitlines() if l.strip()}
@@ -50,17 +51,20 @@ def main():
 
     if args.splits:
         named = load_split_names(args.splits)
-        assign = {s: ("val" if s in named.get("val", set()) else "train") for s in stems
-                  if s in named.get("train", set()) or s in named.get("val", set())}
-        stems = list(assign)
+        assign = {}
+        for split in ("train", "val", "test"):
+            for s in named.get(split, set()):
+                if s in stems:
+                    assign[s] = split
     else:
         random.Random(args.seed).shuffle(stems)
         k = int(len(stems) * args.val_frac)
         assign = {s: "val" for s in stems[:k]}
         assign.update({s: "train" for s in stems[k:]})
 
+    splits = sorted(set(assign.values()))
     src_by_stem = {p.stem: p for p in args.images.iterdir()}
-    for split in ("train", "val"):
+    for split in splits:
         (args.out / "images" / split).mkdir(parents=True, exist_ok=True)
         (args.out / "labels" / split).mkdir(parents=True, exist_ok=True)
 
@@ -69,13 +73,14 @@ def main():
         cv2.imwrite(str(args.out / "images" / split / f"{s}.png"), fluoro_to_rgb(gray))
         shutil.copyfile(args.labels / f"{s}.txt", args.out / "labels" / split / f"{s}.txt")
 
-    (args.out / "dataset.yaml").write_text(
-        f"path: {args.out.resolve()}\n"
-        "train: images/train\nval: images/val\n"
-        "nc: 1\nnames: ['cell']\n"
-    )
-    n_val = sum(v == "val" for v in assign.values())
-    print(f"wrote {len(assign)} images ({n_val} val) -> {args.out}/dataset.yaml")
+    yaml = f"path: {args.out.resolve()}\ntrain: images/train\nval: images/val\n"
+    if "test" in splits:
+        yaml += "test: images/test\n"
+    yaml += "nc: 1\nnames: ['cell']\n"
+    (args.out / "dataset.yaml").write_text(yaml)
+
+    counts = {sp: sum(v == sp for v in assign.values()) for sp in splits}
+    print(f"wrote {len(assign)} images {counts} -> {args.out}/dataset.yaml")
 
 
 if __name__ == "__main__":
