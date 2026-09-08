@@ -72,6 +72,8 @@ python bbbc039/evaluate.py --model runs/detect/*/weights/best.pt --data dataset/
 [bbbc039/usage_example.ipynb](bbbc039/usage_example.ipynb)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/LSaiko/MicroCC/blob/main/bbbc039/usage_example.ipynb)
 — downloads the release weights and runs inference on one image or a folder.
+On Colab, set **Runtime → Change runtime type → GPU** before Run all (CPU works
+but imgsz 1280 is slow); the first cell uploads your image.
 
 ## Tuning
 
