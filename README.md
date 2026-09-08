@@ -39,28 +39,29 @@ More predictions: [showcase/val_predictions_2.jpg](showcase/val_predictions_2.jp
 
 ### vs. other detectors
 
-RT-DETR-L, RetinaNet, FCOS and Faster R-CNN trained on the same split, scored
-through one torchmetrics harness. **All per-image detection caps raised** (see
-significance) — the torchvision models were re-trained at 1280 px too:
+RT-DETR-L, RetinaNet, FCOS and Faster R-CNN trained on the same split; a
+fine-tuned Cellpose too. One harness. **All per-image detection caps raised**
+(see significance). Sorted by count MAE — the task metric. **F1@0.5** is
+precision/recall at IoU 0.5 evaluated at each model's *tuned confidence* — the
+one number comparable across detection and segmentation.
 
-| Model | mAP@50 | mAP@75 | mAR@500 | count MAE (tuned) | ms/img |
+| Model | F1@0.5 | mAP@50 | mAR@500 | count MAE (tuned) | ms/img |
 |---|---|---|---|---|---|
-| Faster R-CNN @1280 | **0.976** | 0.955 | 0.900 | 3.0 | 106 |
-| FCOS @1280 | **0.976** | **0.959** | **0.927** | 3.2 | 86 |
-| **YOLOv8s** @1280 | 0.969 | 0.931 | 0.786 | 3.2 | **34** |
-| Faster R-CNN @800 | 0.968 | 0.955 | 0.903 | 2.9 | 89 |
-| RT-DETR-L @960 | 0.967 | 0.935 | 0.910 | 2.5 | 56 |
-| RetinaNet @800 | 0.956 | 0.935 | 0.891 | 2.6 | 65 |
-| RetinaNet @1280 | 0.955 | 0.933 | 0.888 | 3.3 | 80 |
-| *Cellpose `nuclei`, zero-shot* | *0.84¹* | — | — | *12.6* | *493* |
-| *Cellpose, fine-tuned on BBBC039* | *0.85¹* | — | — | ***2.35*** | *259* |
+| Cellpose (fine-tuned) | 0.880 | 0.85¹ | 0.71 | **2.35** | 259 |
+| RT-DETR-L @960 | 0.881 | 0.967 | 0.910 | 2.45 | 56 |
+| RetinaNet @800 | 0.879 | 0.956 | 0.891 | 2.6 | 65 |
+| Faster R-CNN @800 | 0.882 | 0.968 | 0.903 | 2.9 | 89 |
+| Faster R-CNN @1280 | **0.883** | **0.976** | 0.900 | 3.0 | 106 |
+| FCOS @1280 | 0.881 | **0.976** | **0.927** | 3.2 | 86 |
+| **YOLOv8s** @1280 | 0.876 | 0.969 | 0.786 | 3.2 | **34** |
+| RetinaNet @1280 | 0.873 | 0.955 | 0.888 | 3.3 | 81 |
+| FCOS @800 | **0.883** | 0.975 | 0.921 | 5.1 | 70 |
+| Cellpose (zero-shot) | 0.869 | 0.84¹ | 0.78 | 12.6 | 493 |
 
-¹ Cellpose has no per-object score, so this is its single operating point
-(F1@0.5 0.87 zero-shot → 0.88 fine-tuned), not comparable to the detectors'
-swept mAP. Fine-tuned Cellpose has the **best count MAE in the study**. With
-**COCO-default caps** the torchvision checkpoints score Faster R-CNN 0.839 /
-FCOS 0.838 / RetinaNet 0.881 — what earlier README versions reported before the
-rematch exposed the cause.
+¹ Cellpose has no per-object score — its single operating point, not comparable
+to the detectors' swept mAP. With **COCO-default caps** the torchvision
+checkpoints score Faster R-CNN 0.839 / FCOS 0.838 / RetinaNet 0.881 — what
+earlier README versions reported before the rematch exposed the cause.
 
 ![model comparison](showcase/model_comparison.png)
 
@@ -76,6 +77,11 @@ rematch exposed the cause.
 - **With caps raised, architecture barely matters here.** Two-stage,
   anchor-based, anchor-free FCN, anchor-free YOLO, and a transformer all land in
   mAP@50 0.955–0.976 — a 0.02 spread, within noise on a 40-image val set.
+- **At tuned operating points every model converges to F1@0.5 ≈ 0.88** — all
+  eight detector configs *and* fine-tuned Cellpose (0.873–0.883). The 0.96–0.98
+  mAP describes the PR curve, not the deployed point. Models separate on **count
+  MAE and speed**, not detection F1. (The ~0.88 ceiling is likely the mask→box
+  GT conversion as much as the models.)
 - **Resolution 800 → 1280 is minor** (~+0.01 mAP@50) but does tighten FCOS's
   boxes enough to halve its count MAE (5.1 → 3.2).
 - **mAP@50 still doesn't rank the counting.** FCOS @800 is 3rd on mAP, worst on
@@ -88,9 +94,9 @@ rematch exposed the cause.
   latency (34 ms, 1.6–3× faster) and a one-package workflow, not accuracy.
 - **Zero-shot Cellpose loses badly (count MAE 12.6) — fine-tuned it wins.**
   Fine-tuned on the same 158 images the detectors saw (~9 min), Cellpose posts
-  count MAE **2.35**, the best in the study, essentially unbiased, and throws in
-  a per-nucleus instance mask for free. Cost: 4–8× the detectors' latency
-  (259 ms) and slightly lower detection F1. "Detection beats segmentation" was a
+  count MAE **2.35** (best in the study, essentially unbiased), F1@0.5 0.880
+  (tied with the detectors), and a per-nucleus instance mask for free. Cost:
+  4–8× the detectors' latency (259 ms). "Detection beats segmentation" was a
   benchmarking artifact of testing a pretrained model out of domain.
 
 #### Which model to use
@@ -133,8 +139,9 @@ the obvious next experiment. CPU-only inference is viable for one-off counts
    the pack, or is the 0.97 plateau real?
 3. ~~**Detection vs. segmentation baseline.**~~ ✅ Done — zero-shot Cellpose
    F1@0.5 0.87 / count MAE 12.6 (loses); **fine-tuned Cellpose count MAE 2.35**
-   (best in study). Open follow-up: StarDist; a proper F1@0.5 for the detectors
-   at their tuned operating points, for an apples-to-apples vs. Cellpose.
+   (best in study), F1@0.5 tied with the detectors at their tuned conf. Open
+   follow-up: StarDist; a better mask→box GT (the ~0.88 F1 ceiling looks like a
+   GT-quality limit).
 4. **Tiling (SAHI)** — 512 px tiles at 20 % overlap; may lift recall further on
    the densest fields without a resolution increase.
 5. **Cross-dataset generalisation.** Train on BBBC039, evaluate zero-shot on

@@ -72,6 +72,24 @@ def tv_preds(weights, ds, arch):
             yield {k: v.cpu() for k, v in out.items()}
 
 
+def pr_f1_at_iou(pred_boxes, gt_boxes, thr=0.5):
+    """greedy 1-to-1 matching, IoU >= thr -> (precision, recall, f1)."""
+    if len(pred_boxes) == 0 or len(gt_boxes) == 0:
+        return 0.0, 0.0, 0.0
+    from torchvision.ops import box_iou
+    iou = box_iou(torch.as_tensor(pred_boxes, dtype=torch.float32),
+                  torch.as_tensor(gt_boxes, dtype=torch.float32)).numpy()
+    matched, tp = set(), 0
+    for pi in np.argsort(-iou.max(axis=1)):
+        gi = int(iou[pi].argmax())
+        if iou[pi, gi] >= thr and gi not in matched:
+            matched.add(gi)
+            tp += 1
+    prec, rec = tp / len(pred_boxes), tp / len(gt_boxes)
+    f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
+    return prec, rec, f1
+
+
 def score(pred_iter, ds):
     # nuclei fields hold up to ~165 objects. torchmetrics caps the 50:95 `map` at
     # 100 dets internally (penalises dense predictors), so we report mAP@50 / mAR
@@ -80,13 +98,15 @@ def score(pred_iter, ds):
                                   max_detection_thresholds=[10, 100, 500])
     metric.warn_on_many_detections = False
     sweep = np.round(np.arange(0.2, 0.85, 0.05), 2)
-    gt_counts, scores_per_img = [], []
+    gt_counts, scores_per_img, boxes_per_img, gt_boxes_per_img = [], [], [], []
     t0 = time.time()
     for pred, i in zip(pred_iter, range(len(ds))):
         _, target = ds[i]
         metric.update([pred], [{"boxes": target["boxes"], "labels": target["labels"]}])
         gt_counts.append(len(target["boxes"]))
         scores_per_img.append(pred["scores"].numpy())
+        boxes_per_img.append(pred["boxes"].numpy())
+        gt_boxes_per_img.append(target["boxes"].numpy())
     dt = (time.time() - t0) / len(ds) * 1000
     m = metric.compute()
     gt = np.array(gt_counts)
@@ -101,6 +121,12 @@ def score(pred_iter, ds):
     mae05, bias05, mape05 = stats_at(CONF)
     best_c = min(sweep, key=lambda c: stats_at(c)[0])
     mae_b, bias_b, mape_b = stats_at(best_c)
+
+    # F1@IoU0.5 at the tuned operating point -> comparable to Cellpose's F1
+    f1s = [pr_f1_at_iou(bx[sc >= best_c], gtb, 0.5)
+           for bx, sc, gtb in zip(boxes_per_img, scores_per_img, gt_boxes_per_img)]
+    p_b, r_b, f_b = (float(np.mean(x)) for x in zip(*f1s))
+
     return {
         "mAP50": round(float(m["map_50"]), 4),
         "mAP75": round(float(m["map_75"]), 4),
@@ -111,6 +137,9 @@ def score(pred_iter, ds):
         "best_conf": round(float(best_c), 2),
         "count_MAE@best": round(mae_b, 2),
         "count_MAPE@best_pct": round(mape_b, 2),
+        "P@0.5": round(p_b, 4),
+        "R@0.5": round(r_b, 4),
+        "F1@0.5": round(f_b, 4),
         "ms_per_image": round(dt, 1),
     }
 
@@ -145,7 +174,7 @@ def main():
     merged.update(results)
     path.write_text(json.dumps(merged, indent=2))
 
-    cols = ["mAP50", "mAP75", "mAR500", "count_MAE@0.5", "best_conf",
+    cols = ["mAP50", "F1@0.5", "mAR500", "best_conf",
             "count_MAE@best", "count_MAPE@best_pct", "ms_per_image"]
     print(f"\n{'model':<14} " + " ".join(f"{c:>18}" for c in cols))
     for label, r in results.items():

@@ -25,6 +25,7 @@ from torchmetrics.detection import MeanAveragePrecision
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from dataset import YoloDetectionDataset  # noqa: E402
+from eval_all import pr_f1_at_iou  # noqa: E402
 
 
 def masks_to_boxes(lbl):
@@ -35,25 +36,6 @@ def masks_to_boxes(lbl):
         ys, xs = np.where(lbl == v)
         boxes.append([xs.min(), ys.min(), xs.max() + 1, ys.max() + 1])
     return np.array(boxes, dtype=np.float32).reshape(-1, 4)
-
-
-def pr_f1_at_iou(pred, gt, thr=0.5):
-    """greedy 1-to-1 matching, IoU >= thr."""
-    if len(pred) == 0 or len(gt) == 0:
-        return 0.0, 0.0, 0.0
-    pred, gt = torch.tensor(pred), torch.tensor(gt)
-    from torchvision.ops import box_iou
-    iou = box_iou(pred, gt).numpy()
-    matched_gt, tp = set(), 0
-    for pi in np.argsort(-iou.max(axis=1)):
-        gi = int(iou[pi].argmax())
-        if iou[pi, gi] >= thr and gi not in matched_gt:
-            matched_gt.add(gi)
-            tp += 1
-    prec = tp / len(pred)
-    rec = tp / len(gt)
-    f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
-    return prec, rec, f1
 
 
 def main():

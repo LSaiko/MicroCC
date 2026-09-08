@@ -9,7 +9,10 @@
     "best_conf": 0.5,
     "count_MAE@best": 3.2,
     "count_MAPE@best_pct": 3.18,
-    "ms_per_image": 34.4
+    "P@0.5": 0.8686,
+    "R@0.5": 0.8845,
+    "F1@0.5": 0.8763,
+    "ms_per_image": 35.2
   },
   "RT-DETR-L": {
     "mAP50": 0.9672,
@@ -21,7 +24,10 @@
     "best_conf": 0.7,
     "count_MAE@best": 2.45,
     "count_MAPE@best_pct": 2.52,
-    "ms_per_image": 56.2
+    "P@0.5": 0.8871,
+    "R@0.5": 0.8756,
+    "F1@0.5": 0.8811,
+    "ms_per_image": 57.4
   },
   "Faster R-CNN": {
     "mAP50": 0.9676,
@@ -33,7 +39,10 @@
     "best_conf": 0.8,
     "count_MAE@best": 2.88,
     "count_MAPE@best_pct": 2.83,
-    "ms_per_image": 89.3
+    "P@0.5": 0.8793,
+    "R@0.5": 0.8844,
+    "F1@0.5": 0.8816,
+    "ms_per_image": 88.7
   },
   "Faster R-CNN @1280": {
     "mAP50": 0.9761,
@@ -45,7 +54,10 @@
     "best_conf": 0.75,
     "count_MAE@best": 3.0,
     "count_MAPE@best_pct": 3.04,
-    "ms_per_image": 105.6
+    "P@0.5": 0.8833,
+    "R@0.5": 0.8826,
+    "F1@0.5": 0.8827,
+    "ms_per_image": 106.1
   },
   "RetinaNet": {
     "mAP50": 0.9561,
@@ -57,7 +69,10 @@
     "best_conf": 0.45,
     "count_MAE@best": 2.6,
     "count_MAPE@best_pct": 2.48,
-    "ms_per_image": 64.9
+    "P@0.5": 0.8847,
+    "R@0.5": 0.8743,
+    "F1@0.5": 0.8793,
+    "ms_per_image": 65.6
   },
   "RetinaNet @1280": {
     "mAP50": 0.9547,
@@ -69,7 +84,10 @@
     "best_conf": 0.55,
     "count_MAE@best": 3.25,
     "count_MAPE@best_pct": 3.18,
-    "ms_per_image": 80.0
+    "P@0.5": 0.8787,
+    "R@0.5": 0.8673,
+    "F1@0.5": 0.8727,
+    "ms_per_image": 81.4
   },
   "FCOS": {
     "mAP50": 0.9745,
@@ -81,7 +99,10 @@
     "best_conf": 0.5,
     "count_MAE@best": 5.05,
     "count_MAPE@best_pct": 4.89,
-    "ms_per_image": 69.0
+    "P@0.5": 0.8763,
+    "R@0.5": 0.8923,
+    "F1@0.5": 0.8834,
+    "ms_per_image": 69.8
   },
   "FCOS @1280": {
     "mAP50": 0.9761,
@@ -93,7 +114,10 @@
     "best_conf": 0.6,
     "count_MAE@best": 3.17,
     "count_MAPE@best_pct": 3.18,
-    "ms_per_image": 86.0
+    "P@0.5": 0.8928,
+    "R@0.5": 0.8701,
+    "F1@0.5": 0.881,
+    "ms_per_image": 87.8
   },
   "Cellpose (nuclei)": {
     "mAP50": 0.8376,

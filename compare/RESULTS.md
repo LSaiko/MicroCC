@@ -29,22 +29,31 @@ torchvision models were trained at ~800 px (default) and re-trained at 1280 px
 for the rematch (`model.transform.min_size/max_size`, same everything else,
 18 ep). At eval, **all per-image detection caps are raised** (`eval_all.py`).
 
-## Results (40-image val, one torchmetrics harness, caps raised, sorted by mAP@50)
+## Results (40-image val, one harness, per-image caps raised, sorted by count MAE)
 
-| Model | mAP@50 | mAP@75 | mAR@500 | count MAE @0.5 | best conf | **count MAE @best** | ms/img |
+**F1@0.5** is precision/recall at IoU 0.5 evaluated **at each model's tuned
+confidence** — the operating point you would deploy, and the one number
+comparable to Cellpose (which has no PR curve to sweep). mAP@50 is the swept
+metric; it structurally favours anything with a confidence score.
+
+| Model | F1@0.5¹ | mAP@50 | mAR@500 | best conf | **count MAE** | count MAPE | ms/img |
 |---|---|---|---|---|---|---|---|
-| Faster R-CNN @1280 | **0.976** | 0.955 | 0.900 | 12.8 | 0.75 | 3.0 | 106 |
-| FCOS @1280 | **0.976** | **0.959** | **0.927** | 12.8 | 0.60 | 3.2 | 86 |
-| FCOS @800 | 0.975 | 0.955 | 0.921 | 5.1 | 0.50 | 5.1 | 69 |
-| **YOLOv8s** @1280 | 0.969 | 0.931 | 0.786 | 3.2 | 0.50 | 3.2 | **34** |
-| Faster R-CNN @800 | 0.968 | 0.955 | 0.903 | 13.0 | 0.80 | **2.9** | 89 |
-| RT-DETR-L @960 | 0.967 | 0.935 | 0.910 | 12.5 | 0.70 | **2.5** | 56 |
-| RetinaNet @800 | 0.956 | 0.935 | 0.891 | 6.6 | 0.45 | **2.6** | 65 |
-| RetinaNet @1280 | 0.955 | 0.933 | 0.888 | 4.0 | 0.55 | 3.3 | 80 |
+| Cellpose (fine-tuned) | 0.880 | 0.85² | 0.714 | — | **2.35** | 2.3 % | 259 |
+| RT-DETR-L @960 | 0.881 | 0.967 | 0.910 | 0.70 | 2.45 | 2.5 % | 56 |
+| RetinaNet @800 | 0.879 | 0.956 | 0.891 | 0.45 | 2.6 | 2.5 % | 65 |
+| Faster R-CNN @800 | 0.882 | 0.968 | 0.903 | 0.80 | 2.9 | 2.8 % | 89 |
+| Faster R-CNN @1280 | **0.883** | **0.976** | 0.900 | 0.75 | 3.0 | 3.0 % | 106 |
+| FCOS @1280 | 0.881 | **0.976** | **0.927** | 0.60 | 3.2 | 3.2 % | 88 |
+| **YOLOv8s** @1280 | 0.876 | 0.969 | 0.786 | 0.50 | 3.2 | 3.2 % | **35** |
+| RetinaNet @1280 | 0.873 | 0.955 | 0.888 | 0.55 | 3.3 | 3.2 % | 81 |
+| FCOS @800 | **0.883** | 0.975 | 0.921 | 0.50 | 5.1 | 4.9 % | 70 |
+| Cellpose (zero-shot) | 0.869 | 0.84² | 0.776 | — | 12.6 | 11.6 % | 493 |
+
+¹ greedy 1-to-1 match, IoU ≥ 0.5. ² Cellpose score-1.0 operating point.
 
 ![comparison](comparison.png)
 
-For reference, the same torchvision checkpoints **with COCO-default caps**:
+For reference, the torchvision checkpoints **with COCO-default caps**:
 Faster R-CNN 0.839, FCOS 0.838, RetinaNet 0.881 — the numbers rounds 1–2 reported.
 
 ## Segmentation baseline — Cellpose (zero-shot **and** fine-tuned)
@@ -76,11 +85,17 @@ over-segmentation (precision 0.83 → 0.88, the +12 % bias → −1 %) and halve
 inference time (493 → 259 ms).
 
 Trade-offs that remain: Cellpose is still **4–8× slower** than the detectors
-(259 ms vs. 34–106), and its detection quality by F1@0.5 (0.88) trails the
-detectors' mAP-implied ~0.93–0.95. What it adds: a full instance mask per
-nucleus (area, shape, intensity) for free. **For counting BBBC039 with labels
-in hand, fine-tuned Cellpose is the most accurate option; among the detectors,
-RT-DETR-L is the best counter and YOLOv8s the fastest.**
+(259 ms vs. 34–106). It also adds a full instance mask per nucleus (area, shape,
+intensity) for free. **For counting BBBC039 with labels in hand, fine-tuned
+Cellpose is the most accurate option; among the detectors, RT-DETR-L is the best
+counter and YOLOv8s the fastest.**
+
+**On detection quality (F1@0.5 at tuned conf) fine-tuned Cellpose is
+indistinguishable from the detectors** — 0.880 vs. their 0.87–0.88. The mAP@50
+gap (0.85 vs. 0.97) is almost entirely the score-1.0 penalty: mAP rewards having
+a confidence to sweep, which segmentation structurally lacks. At the operating
+point you would actually run, detection and fine-tuned segmentation localise
+equally well.
 
 ## Findings
 
@@ -91,6 +106,13 @@ RT-DETR-L is the best counter and YOLOv8s the fastest.**
    +0.13 swing from three config lines. Verified in isolation: Faster R-CNN
    averages 92 boxes/image at the default cap of 100, 118 at cap 300 — the field
    simply has more nuclei than the model is allowed to emit.
+
+1b. **At tuned operating points, every trained model converges to F1@0.5 ≈
+   0.88** — all eight detector configs *and* fine-tuned Cellpose, spread 0.873–
+   0.883. The 0.96–0.98 mAP@50 figures describe the PR curve, not the deployed
+   point; on this GT the IoU-0.5 localisation ceiling is ~0.88 (likely the
+   mask→box GT conversion as much as the models). **Models separate on count
+   MAE and speed, not on detection F1.**
 
 2. **With caps raised, architecture barely matters here.** Two-stage
    (Faster R-CNN), anchor-based one-stage (RetinaNet), anchor-free FCN (FCOS),
