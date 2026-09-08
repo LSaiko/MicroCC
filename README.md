@@ -68,6 +68,10 @@ python bbbc039/evaluate.py --model runs/detect/*/weights/best.pt --data dataset/
 
 `python bbbc039/test_masks_to_yolo.py` runs the label-conversion self-check.
 
+**Just want to count cells with the trained model?** See
+[bbbc039/usage_example.ipynb](bbbc039/usage_example.ipynb) — downloads the
+release weights and runs inference on one image or a folder.
+
 ## Tuning
 
 Small objects (~20×20 px nuclei) on an 8 GB GPU:
