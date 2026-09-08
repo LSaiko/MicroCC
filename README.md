@@ -37,6 +37,21 @@ Predicted boxes (left) vs. ground truth (right) on a val batch:
 
 More predictions: [showcase/val_predictions_2.jpg](showcase/val_predictions_2.jpg)
 
+### vs. other detectors
+
+Faster R-CNN and RetinaNet (torchvision, ResNet50-FPN) trained on the same split:
+
+| Model | mAP@50 | count MAE (tuned) | ms/img |
+|---|---|---|---|
+| **YOLOv8s** | **0.969** | **3.2** | **35** |
+| RetinaNet | 0.881 | 3.5 | 63 |
+| Faster R-CNN | 0.839 | 13.4 | 86 |
+
+(mAP@50 here uses a shared torchmetrics harness, hence 0.969 vs the 0.979 from
+ultralytics' own validator above.) Full study: [compare/RESULTS.md](compare/RESULTS.md).
+
+![model comparison](showcase/model_comparison.png)
+
 ![training curves](showcase/training_curves.png)
 ![precision-recall](showcase/pr_curve.png)
 

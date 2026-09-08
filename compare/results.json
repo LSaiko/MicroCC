@@ -1,0 +1,38 @@
+{
+  "YOLOv8s": {
+    "mAP50": 0.9689,
+    "mAP75": 0.9314,
+    "mAR500": 0.7861,
+    "count_MAE@0.5": 3.2,
+    "count_MAPE@0.5_pct": 3.18,
+    "count_bias@0.5": 84,
+    "best_conf": 0.5,
+    "count_MAE@best": 3.2,
+    "count_MAPE@best_pct": 3.18,
+    "ms_per_image": 34.6
+  },
+  "Faster R-CNN": {
+    "mAP50": 0.839,
+    "mAP75": 0.8366,
+    "mAR500": 0.785,
+    "count_MAE@0.5": 14.8,
+    "count_MAPE@0.5_pct": 13.49,
+    "count_bias@0.5": -430,
+    "best_conf": 0.8,
+    "count_MAE@best": 13.4,
+    "count_MAPE@best_pct": 11.32,
+    "ms_per_image": 85.7
+  },
+  "RetinaNet": {
+    "mAP50": 0.8811,
+    "mAP75": 0.8606,
+    "mAR500": 0.8223,
+    "count_MAE@0.5": 17.93,
+    "count_MAPE@0.5_pct": 16.65,
+    "count_bias@0.5": -717,
+    "best_conf": 0.25,
+    "count_MAE@best": 3.45,
+    "count_MAPE@best_pct": 3.53,
+    "ms_per_image": 62.8
+  }
+}
