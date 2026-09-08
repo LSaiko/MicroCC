@@ -53,12 +53,14 @@ significance) — the torchvision models were re-trained at 1280 px too:
 | RetinaNet @800 | 0.956 | 0.935 | 0.891 | 2.6 | 65 |
 | RetinaNet @1280 | 0.955 | 0.933 | 0.888 | 3.3 | 80 |
 | *Cellpose `nuclei`, zero-shot* | *0.84¹* | — | — | *12.6* | *493* |
+| *Cellpose, fine-tuned on BBBC039* | *0.85¹* | — | — | ***2.35*** | *259* |
 
-¹ Cellpose has no per-object score, so this is its single operating point (F1@0.5
-= 0.87), not comparable to the detectors' swept mAP. With **COCO-default caps**
-the torchvision checkpoints score Faster R-CNN 0.839 / FCOS 0.838 / RetinaNet
-0.881 — what earlier versions of this README reported before the rematch exposed
-the cause.
+¹ Cellpose has no per-object score, so this is its single operating point
+(F1@0.5 0.87 zero-shot → 0.88 fine-tuned), not comparable to the detectors'
+swept mAP. Fine-tuned Cellpose has the **best count MAE in the study**. With
+**COCO-default caps** the torchvision checkpoints score Faster R-CNN 0.839 /
+FCOS 0.838 / RetinaNet 0.881 — what earlier README versions reported before the
+rematch exposed the cause.
 
 ![model comparison](showcase/model_comparison.png)
 
@@ -84,18 +86,21 @@ the cause.
   swaps in another detector counts wrong.
 - **YOLOv8s now has the *lowest* recall of the five** (mAR 0.786). Its edge is
   latency (34 ms, 1.6–3× faster) and a one-package workflow, not accuracy.
-- **Zero-shot Cellpose (the domain-standard segmentation tool) loses badly** —
-  F1 0.87, count MAE 12.6, +12 % systematic over-count, 493 ms/image. A detector
-  trained 15–25 min on 160 labelled images is ~4× more accurate at counting.
-  Cellpose wins only when you have *no* labels or need per-nucleus masks.
+- **Zero-shot Cellpose loses badly (count MAE 12.6) — fine-tuned it wins.**
+  Fine-tuned on the same 158 images the detectors saw (~9 min), Cellpose posts
+  count MAE **2.35**, the best in the study, essentially unbiased, and throws in
+  a per-nucleus instance mask for free. Cost: 4–8× the detectors' latency
+  (259 ms) and slightly lower detection F1. "Detection beats segmentation" was a
+  benchmarking artifact of testing a pretrained model out of domain.
 
 #### Which model to use
 
 | If you need… | Pick | Caveat |
 |---|---|---|
-| Lowest latency, single-package workflow | **YOLOv8s** | lowest recall of the five; fine for well-separated nuclei, weakest on confluent fields |
-| Highest recall on crowded/confluent fields | **FCOS @1280** or **RT-DETR-L** | 2.5–3× YOLO's latency; FCOS needs its detection caps raised, RT-DETR needs 960 px / 7 GB |
-| Best tuned count MAE | **RT-DETR-L** (2.5) / **RetinaNet @800** (2.6) | both need per-model conf (0.70 / 0.45) |
+| Lowest latency, single-package workflow | **YOLOv8s** | lowest recall of the detectors; fine for well-separated nuclei, weakest on confluent fields |
+| Lowest count error + per-nucleus masks | **fine-tuned Cellpose** (MAE 2.35) | 4–8× slower (259 ms); needs instance-label masks to train (built from BBBC039 semantic masks) |
+| Best count MAE among detectors | **RT-DETR-L** (2.5) / **RetinaNet @800** (2.6) | per-model conf (0.70 / 0.45); RT-DETR needs 960 px / 7 GB |
+| Highest detection recall on crowded fields | **FCOS @1280** or **RT-DETR-L** | 2.5–3× YOLO's latency; FCOS needs its detection caps raised |
 | A `torchvision`-only stack | **Faster R-CNN** or **FCOS** | competitive *only* with `detections_per_img`/`topk_candidates` raised well above your max object count |
 
 #### Capacity vs. hardware (measured on RTX 5060, 8 GB)
@@ -127,9 +132,9 @@ the obvious next experiment. CPU-only inference is viable for one-off counts
 2. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU — does it pull clear of
    the pack, or is the 0.97 plateau real?
 3. ~~**Detection vs. segmentation baseline.**~~ ✅ Done — zero-shot Cellpose
-   `nuclei` scores F1@0.5 0.87 / count MAE 12.6, ~4× worse than the trained
-   detectors. Open follow-up: a Cellpose model *fine-tuned* on BBBC039 (the fair
-   trained-vs-trained fight); add StarDist.
+   F1@0.5 0.87 / count MAE 12.6 (loses); **fine-tuned Cellpose count MAE 2.35**
+   (best in study). Open follow-up: StarDist; a proper F1@0.5 for the detectors
+   at their tuned operating points, for an apples-to-apples vs. Cellpose.
 4. **Tiling (SAHI)** — 512 px tiles at 20 % overlap; may lift recall further on
    the densest fields without a resolution increase.
 5. **Cross-dataset generalisation.** Train on BBBC039, evaluate zero-shot on

@@ -1,16 +1,18 @@
-"""Cellpose (instance segmentation) as a counting baseline — zero-shot, no training.
+"""Cellpose (instance segmentation) as a counting baseline.
 
-    python compare/cellpose_baseline.py
+    python compare/cellpose_baseline.py                       # zero-shot 'nuclei'
+    python compare/cellpose_baseline.py --model compare/runs/cellpose_ft/... --label "Cellpose (finetuned)"
 
-Runs the pretrained Cellpose `nuclei` model on the val split, derives a count
-(number of mask labels) and bounding boxes (one per label), and scores the same
-metrics as the detectors. Appends a "Cellpose (nuclei)" row to compare/results.json.
+Runs a Cellpose model on the val split, derives a count (number of mask labels)
+and bounding boxes (one per label), and scores the same metrics as the detectors.
+Appends a row to compare/results.json.
 
 Cellpose commits to one segmentation and emits no per-object confidence, so:
   - mAP@50 is computed with every box scored 1.0 (its single operating point);
   - precision / recall / F1 @ IoU 0.5 (greedy match) is the honest apples-to-apples
     number vs. the detectors' tuned operating point.
 """
+import argparse
 import json
 import pathlib
 import sys
@@ -55,9 +57,18 @@ def pr_f1_at_iou(pred, gt, thr=0.5):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--model", default="nuclei", help="'nuclei' or a path to a fine-tuned model")
+    ap.add_argument("--label", default="Cellpose (nuclei)", help="results.json key")
+    args = ap.parse_args()
+
     from cellpose import models
     ds = YoloDetectionDataset("dataset", "val", train=False)
-    model = models.Cellpose(gpu=torch.cuda.is_available(), model_type="nuclei")
+    gpu = torch.cuda.is_available()
+    if args.model == "nuclei":
+        model = models.Cellpose(gpu=gpu, model_type="nuclei")
+    else:
+        model = models.CellposeModel(gpu=gpu, pretrained_model=args.model)
 
     metric = MeanAveragePrecision(iou_type="bbox", box_format="xyxy",
                                   max_detection_thresholds=[10, 100, 500])
@@ -67,7 +78,8 @@ def main():
     for i in range(len(ds)):
         img = cv2.imread(str(ds.imgs[i]), cv2.IMREAD_UNCHANGED)
         gray = img[..., 1] if img.ndim == 3 else img          # green channel = signal
-        lbl, _, _, _ = model.eval(gray, diameter=None, channels=[0, 0])
+        out = model.eval(gray, diameter=None, channels=[0, 0])
+        lbl = out[0]                                          # (masks, flows, styles[, diams])
         boxes = masks_to_boxes(lbl)
         _, target = ds[i]
         gt = target["boxes"].numpy()
@@ -105,10 +117,10 @@ def main():
 
     path = pathlib.Path("compare/results.json")
     results = json.loads(path.read_text()) if path.exists() else {}
-    results["Cellpose (nuclei)"] = row
+    results[args.label] = row
     path.write_text(json.dumps(results, indent=2))
 
-    print("\nCellpose (nuclei), zero-shot, val split:")
+    print(f"\n{args.label}, val split:")
     for k, v in row.items():
         print(f"  {k:<20} {v}")
     print("\nappended -> compare/results.json")

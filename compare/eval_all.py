@@ -139,7 +139,11 @@ def main():
         print(f"scoring {label} ...", flush=True)
         results[label] = score(fn(), ds)
 
-    pathlib.Path("compare/results.json").write_text(json.dumps(results, indent=2))
+    # merge, keeping any Cellpose rows written by cellpose_baseline.py
+    path = pathlib.Path("compare/results.json")
+    merged = json.loads(path.read_text()) if path.exists() else {}
+    merged.update(results)
+    path.write_text(json.dumps(merged, indent=2))
 
     cols = ["mAP50", "mAP75", "mAR500", "count_MAE@0.5", "best_conf",
             "count_MAE@best", "count_MAPE@best_pct", "ms_per_image"]

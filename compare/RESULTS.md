@@ -47,31 +47,40 @@ for the rematch (`model.transform.min_size/max_size`, same everything else,
 For reference, the same torchvision checkpoints **with COCO-default caps**:
 Faster R-CNN 0.839, FCOS 0.838, RetinaNet 0.881 — the numbers rounds 1–2 reported.
 
-## Segmentation baseline — Cellpose (zero-shot)
+## Segmentation baseline — Cellpose (zero-shot **and** fine-tuned)
 
-The task's framing contrasts detection with segmentation, so: the pretrained
-Cellpose `nuclei` model, **no training on BBBC039**, auto-diameter, run on the
-same 40 val images. Count = number of mask labels; boxes = one per label.
-Cellpose commits to a single segmentation and emits no per-object score, so
-mAP@50 uses score 1.0 (its operating point) and the honest comparison is
-precision / recall / F1 at IoU 0.5.
+The task's framing contrasts detection with segmentation. Cellpose predicts an
+instance-label mask; count = number of labels, boxes = one per label. It commits
+to a single segmentation and emits no per-object score, so mAP@50 uses score 1.0
+(its operating point) and the honest comparison is precision / recall / F1 at
+IoU 0.5. Two runs:
 
-| | mAP@50¹ | P@0.5 | R@0.5 | F1@0.5 | count MAE | count bias | ms/img |
+- **zero-shot**: pretrained `nuclei` model, no BBBC039 training, auto-diameter.
+- **fine-tuned**: same `nuclei` model fine-tuned on the same 158 train images as
+  the detectors (150 epochs, ~9 min on the RTX 5060). Instance-label masks built
+  from BBBC039's semantic masks (interior-class connected components).
+
+| | mAP@50¹ | P@0.5 | R@0.5 | F1@0.5 | **count MAE** | count bias | ms/img |
 |---|---|---|---|---|---|---|---|
-| Cellpose (nuclei), zero-shot | 0.838 | 0.83 | 0.92 | **0.87** | **12.6** | **+493** (+12 %) | 493 |
-| *trained detectors (range)* | *0.96–0.98* | — | — | *≈0.95+* | *2.5–3.3* | *±80–260 @best conf* | *34–106* |
+| Cellpose, zero-shot | 0.84 | 0.83 | 0.92 | 0.87 | 12.6 | +493 (+12 %) | 493 |
+| **Cellpose, fine-tuned** | 0.85 | 0.88 | 0.88 | **0.88** | **2.35** | **−38 (−1 %)** | 259 |
+| *trained detectors (range)* | *0.96–0.98* | — | — | — | *2.5–3.3* | *tuned* | *34–106* |
 
-¹ score-1.0 operating point, not directly comparable to the detectors' swept mAP.
+¹ score-1.0 operating point, not comparable to the detectors' swept mAP.
 
-**Cellpose zero-shot is decisively beaten by every trained detector** — F1 0.87
-vs. ~0.95+, count MAE 12.6 vs. 2.5–3.3, and it systematically **over-counts by
-12 %** (recall 0.92 is fine; precision 0.83 is not — it splits nuclei the
-detectors keep whole). It is also 5–15× slower (493 ms; the flow post-processing
-is the cost). What it buys that detection does not: a full instance mask per
-nucleus (area, shape, intensity), and it needs **zero labels** — which is the
-only situation where it wins here, since BBBC039 *has* labels. A Cellpose model
-*fine-tuned* on BBBC039 would be the fair segmentation-vs-detection fight and is
-left for future work.
+**The zero-shot failure was domain mismatch, not a paradigm limit.** Fine-tuned
+on the same 158 labelled images the detectors saw, Cellpose posts the **lowest
+count MAE in the entire study — 2.35, essentially unbiased** — beating
+RT-DETR-L (2.45) and every YOLO/torchvision config. Fine-tuning fixed the
+over-segmentation (precision 0.83 → 0.88, the +12 % bias → −1 %) and halved
+inference time (493 → 259 ms).
+
+Trade-offs that remain: Cellpose is still **4–8× slower** than the detectors
+(259 ms vs. 34–106), and its detection quality by F1@0.5 (0.88) trails the
+detectors' mAP-implied ~0.93–0.95. What it adds: a full instance mask per
+nucleus (area, shape, intensity) for free. **For counting BBBC039 with labels
+in hand, fine-tuned Cellpose is the most accurate option; among the detectors,
+RT-DETR-L is the best counter and YOLOv8s the fastest.**
 
 ## Findings
 
@@ -131,11 +140,13 @@ left for future work.
   FCOS @1280 (0.927) and RetinaNet @800 (0.891) match or beat it once uncapped —
   the earlier "NMS discards touching nuclei" advantage was partly the other
   models being throttled upstream of NMS.
-- **When labels exist, train a detector — don't reach for the off-the-shelf
-  segmentation tool.** Zero-shot Cellpose (F1 0.87, count MAE 12.6) is ~4× worse
-  at counting than a detector trained for 15–25 min on 160 images, and 5–15×
-  slower. Cellpose earns its place only with *no* labels, or when you need the
-  per-nucleus mask (area/shape/intensity) that a bounding box can't give.
+- **Off-the-shelf ≠ the method's ceiling.** Zero-shot Cellpose (count MAE 12.6)
+  looked like a paradigm loss; fine-tuned on the same 158 images it posts the
+  best count MAE of the study (2.35). If you benchmark a pretrained model on a
+  new domain, you are measuring domain transfer, not the architecture. The real
+  choice here is **fine-tuned Cellpose** (best count accuracy + free instance
+  masks, 4–8× slower) vs. **a detector** (faster, box-only) — not
+  "detection beats segmentation."
 
 ## Reproduce
 
@@ -150,9 +161,13 @@ python compare/train_tv.py --model retinanet  --epochs 18 --imgsz 1280 --tag 128
 python compare/train_tv.py --model fcos       --epochs 18 --imgsz 1280 --tag 1280
 # RT-DETR
 python compare/train_rtdetr.py --epochs 100 --imgsz 960     # converges ~ep 47
-# score all checkpoints (caps raised inside eval_all.py) + plot
+# Cellpose (pip install "cellpose<4" -- downgrades numpy to 2.0.2)
+python compare/cellpose_finetune.py --epochs 150            # ~9 min
+python compare/cellpose_baseline.py                          # zero-shot 'nuclei'
+python compare/cellpose_baseline.py \
+    --model compare/runs/cellpose_ft/models/bbbc039_ft --label "Cellpose (finetuned)"
+# score all detector checkpoints (caps raised inside eval_all.py) + plot
 python compare/eval_all.py
-python compare/cellpose_baseline.py    # zero-shot segmentation baseline (pip install "cellpose<4")
 python compare/plot_results.py
 ```
 
