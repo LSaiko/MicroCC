@@ -9,8 +9,9 @@ architecture.*
 ## Abstract
 
 We trained five object detectors (YOLOv8s, RT-DETR-L, Faster R-CNN, RetinaNet,
-FCOS) and a segmentation model (Cellpose, zero-shot and fine-tuned) to count
-cell nuclei in the BBBC039 fluorescence-microscopy dataset, and scored all of
+FCOS) and two segmentation models (Cellpose — zero-shot and fine-tuned — and
+StarDist) to count cell nuclei in the BBBC039 fluorescence-microscopy dataset,
+and scored all of
 them through a single evaluation harness. **At each model's tuned operating
 point, every trained model reaches F1@0.5 ≈ 0.89–0.90** (custom val split;
 0.94 on the official test split) **and count MAE 1.5–2.6 nuclei/image** —
@@ -45,7 +46,7 @@ invisible in-domain.
 | **Split** | 160 train / 40 val (seed 0). Val: 3 853 nuclei, mean 96/image, max 141 |
 | **Ground truth** | watershed instance masks from BBBC039's semantic (interior/boundary) masks; boxes = tight extent, fragments < 25 px² dropped (§2.4) |
 | **Detectors** | COCO-pretrained, 1-class head, hflip aug. YOLO 1280 px, RT-DETR 960 px, torchvision ResNet50-FPN ~800 px |
-| **Segmentation** | Cellpose 3.1 `nuclei` — zero-shot, and fine-tuned 150 ep on the same 160 train images |
+| **Segmentation** | Cellpose 3.1 `nuclei` — zero-shot, and fine-tuned 150 ep on the same 160 train images; StarDist2D trained from scratch (§2.7 follow-up F) |
 | **Hardware** | single RTX 5060 (8 GB), ~15–30 min/model |
 | **Harness** | one `torchmetrics` pass: mAP@50/75, mAR@500, a per-model confidence sweep for count MAE, and **F1@0.5** (precision/recall at IoU 0.5, optimal Hungarian matching) evaluated at the swept confidence |
 
@@ -350,14 +351,42 @@ in the study. We then fine-tuned the same model on the same 160 training images
 (150 epochs, ~9 min). It rose to **F1@0.5 0.903 — the best of any model** — and
 count MAE 2.27, essentially unbiased, at half the inference time (240 ms).
 
-**Conclusion.** Benchmarking a pretrained model on a new domain measures domain
-transfer, not the architecture. The real trade-off is: fine-tuned Cellpose
-gives the best F1 and a per-nucleus instance mask (area, shape, intensity) at
-4–7× a detector's latency; a detector gives a box at 33–86 ms. "Detection beats
-segmentation" was never true here.
+**Follow-up F (done) — is fine-tuned Cellpose representative of segmentation, or
+a one-off?** Trained **StarDist2D** (star-convex polygon regression + polygon
+NMS — a different segmentation paradigm from Cellpose's flow fields) from scratch
+on the official 100-image train split, scored on the 50-image test split through
+the same harness. Cellpose was re-trained on official-train only for a matched
+comparison (follow-up D's model). Both at their default operating point (no
+threshold tuning — StarDist's `optimize_thresholds` is ~30 min/threshold on CPU,
+and Cellpose isn't tuned either):
 
-**Confidence: high** for the direction; **medium** for whether fine-tuned
-Cellpose's small F1 lead is real (0.903 vs 0.900, within noise).
+| model | F1@0.5 | mAP@50 | count MAE | count bias / 50 img |
+|---|---|---|---|---|
+| Cellpose (fine-tuned, official) | **0.947** | 0.887 | 2.56 | +54 |
+| StarDist (fine-tuned) | 0.928 | 0.852 | 5.00 | +230 |
+| *ref: detectors (§2.1)* | *0.937–0.943* | *0.96–0.97* | *1.8–2.2* | — |
+
+**Both trained segmentation models land in the detector F1@0.5 band** — so
+fine-tuned Cellpose is **not a one-off**; the "trained segmentation ties
+detection" result holds across segmentation architectures. But it is not
+architecture-*invariant*: StarDist trails Cellpose by ~2 F1 points and nearly
+doubles the count error, over-counting by ~4.6 nuclei/image (star-convex
+polygons split the occasional clumped/concave nucleus, and the untuned
+`prob_thresh` = 0.5 keeps too many). The within-segmentation spread (~2 pts) is
+larger than the within-detector spread (~0.6 pts, §2.1) — *which* segmentation
+model, and its thresholds, matters more than which detector.
+
+**Conclusion.** Benchmarking a pretrained model on a new domain measures domain
+transfer, not the architecture. Any *trained* segmentation model reaches the
+detector band; Cellpose is not special, though it is the better-behaved choice
+here. The real trade-off is: fine-tuned Cellpose gives the best F1 and a
+per-nucleus instance mask (area, shape, intensity) at 4–7× a detector's latency;
+a detector gives a box at 33–86 ms. "Detection beats segmentation" was never
+true here.
+
+**Confidence: high** for the direction and for trained-segmentation reaching the
+detector band (two architectures now); **medium** for the exact
+Cellpose-vs-StarDist gap (single seed, StarDist thresholds untuned).
 
 ### 2.8 There is no NMS-free advantage on this task — the earlier appearance of one was entirely the detection-cap confound
 
@@ -458,7 +487,7 @@ too small to trust.)
   per-finding tables in §2 (except §2.1's follow-up) are single-seed and use a
   160/40 split. **§2.1 follow-up A fixes this** for YOLOv8s / RT-DETR-L /
   Faster R-CNN: 3 seeds on the official 100/50/50 split, scored on the held-out
-  test set. RetinaNet, FCOS, and Cellpose are still single-seed.
+  test set. RetinaNet, FCOS, Cellpose, and StarDist are still single-seed.
 - **Asymmetric tuning.** YOLO's augmentation and learning-rate schedule were
   tuned; the torchvision models got a light, uniform recipe. **Follow-up G
   (§2.1)** closes this: giving Faster R-CNN and RetinaNet a YOLO-equivalent
@@ -490,7 +519,7 @@ complete.
 | C | Controlled NMS-free test: matched detection budgets, swept NMS IoU | §2.8 — true size of RT-DETR's recall advantage | **done — §2.8.** No NMS-free advantage: NMS suppresses 0.0–0.3 % of correct detections; strict NMS (IoU 0.30) is best; RT-DETR-L (F1 0.938) sits *behind* RetinaNet (0.948) and FCOS (0.957). The round-1–2 lead was 100 % the detection-cap confound. `compare/followup_c.json` |
 | D | Independent labeller (Cellpose trained on official-train only) as a second GT; re-measure the F1 ceiling | §2.4 — how much residual is model vs. label | **done — §2.4.** Labellers disagree on 5–6 % of nuclei; ~1/3 of the F1 residual is label ambiguity, ~2/3 genuine model/task difficulty. `compare/followup_d.json` |
 | E | Learned per-image confidence threshold | §2.6 — remove the post-hoc sweep | **done — §2.6.** Oracle per-image threshold cuts count MAE 2.13 → 0.36 (huge headroom), but a supervised threshold regressor from 50 val images does *worse* than the global threshold. Needs a count-native model or a training-time count loss. `compare/followup_e.json` |
-| F | StarDist as a second segmentation baseline | §2.7 — is fine-tuned Cellpose representative? | open |
+| F | StarDist as a second segmentation baseline | §2.7 — is fine-tuned Cellpose representative? | **done — §2.7.** Fine-tuned StarDist2D F1@0.5 0.928 (Cellpose-official 0.947) — a second, architecturally distinct trained segmentation model also lands in the detector band, so Cellpose isn't a one-off. StarDist over-counts (+4.6/img, untuned `prob_thresh`); within-segmentation spread (~2 pts) > within-detector spread (~0.6). `compare/followup_f.json` |
 | G | Match torchvision training effort to YOLO's (aug, schedule) | §2.1 — does the convergence survive equal tuning? | **done — §2.1.** Strong aug + 60 ep + LR warm-up: Faster R-CNN F1@0.5 stays at 0.943 (identical to light recipe); RetinaNet drops to 0.924 (focal head sensitive to the aug shift). Not a tuning-effort artifact. `compare/followup_g.json` |
 | H | Count-native density-map model | §2.6 — realise the oracle-threshold headroom (MAE 2.1 → toward 0.4) | **done — §2.6.** Density-map counter (ResNet18 U-Net) reaches test count MAE 1.94 — on par with the detector (2.13), still ≫ oracle (0.36). Neither post-hoc nor count-native reaches the oracle. `bbbc039/count_head.py` |
 | H2 | Count-consistency loss *inside* detector training (differentiable soft-count vs GT count) | §2.6 — the one untried route that operates on the detector's own predictions | **done — §2.6.** A peak-count auxiliary loss on YOLO's P3 score map (3 configs, incl. bounded + warm-up) degrades mAP without improving the count. Oracle headroom stays unrealised by all three routes. `compare/followup_h2.py` |
@@ -511,6 +540,8 @@ Follow-ups: `compare/followup_a_{train,eval}.py` (§2.1, official split + seeds)
 `curl -O https://data.broadinstitute.org/bbbc/BBBC038/stage1_train.zip`),
 `compare/followup_{c,d,e}.py` (§2.8 / §2.4 / §2.6),
 `compare/followup_g.py` + `compare/train_tv.py --aug strong --warmup` (§2.1, equal-effort retrain),
+`compare/followup_f{,_train}.py` (§2.7, StarDist — trains in an isolated
+`.venv-stardist` TF env, `uv venv --python 3.12`),
 `bbbc039/count_head.py` (§2.6, density-map counter; `test_count_head.py` self-check).
 
 ---

@@ -98,7 +98,10 @@ to the detectors' swept mAP.
 - **Zero-shot ≠ the ceiling.** Off-the-shelf Cellpose (F1 0.78, count MAE 16)
   looked like a paradigm loss; fine-tuned on the same 158 images it posts the
   **best F1@0.5 of any model (0.903)**. "Detection beats segmentation" was an
-  out-of-domain artifact.
+  out-of-domain artifact. A second trained segmentation model, **StarDist**
+  ([§2.7 follow-up F](REPORT.md)), also lands in the detector band (F1 0.928 vs
+  Cellpose 0.947 on the official test) — Cellpose isn't a one-off, though *which*
+  segmentation model matters more than which detector.
 - **The F1 ceiling is ~1/3 label, ~2/3 model** ([§2.4](REPORT.md)). Two competent
   labellers disagree on 5–6 % of nuclei; the model tops out at ~0.95–0.96 even
   against the friendliest GT.
@@ -172,9 +175,11 @@ the obvious next experiment. CPU-only inference is viable for one-off counts
     the architecture convergence is not an under-tuning artifact.
 12. **Better-engineered count loss** — Hungarian-matched, or on a DETR-style set
     predictor (research-scale; the oracle headroom is still open).
-13. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU.
-14. **Tiling (SAHI)** — 512 px tiles, 20 % overlap.
-15. **StarDist** as a second segmentation baseline.
+13. ~~**StarDist as a second segmentation baseline (follow-up F).**~~ ✅ F1@0.5
+    0.928 (Cellpose 0.947) — trained segmentation reaches the detector band
+    regardless of architecture; StarDist over-counts with untuned thresholds.
+14. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU.
+15. **Tiling (SAHI)** — 512 px tiles, 20 % overlap.
 
 Full study, corrections, and per-model detail: [compare/RESULTS.md](compare/RESULTS.md).
 
