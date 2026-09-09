@@ -289,13 +289,27 @@ nucleus centroid, count = the map's integral, no detection / NMS / threshold.
 | oracle per-image threshold (LB) | 0.36 | — |
 
 The count-native model is **on par with the detector** (marginally better on
-test, worse on the harder val split — MAE 3.4) and, like the post-hoc route,
-**does not approach the oracle**. So neither dropping detection entirely nor a
-post-hoc threshold closes the 2.1 → 0.4 gap. What remains untried is a
-*count-consistency loss inside detector training* (differentiable soft-count vs.
-GT count), which is the one route that operates on the detector's own predictions
-where the oracle headroom lives. That needs hooking the training loss and is
-left as further work.
+test, worse on the harder val split — MAE 3.4) and **does not approach the
+oracle**.
+
+**Follow-up H2 — a count-consistency loss *inside* YOLO training.**
+`compare/followup_h2.py` monkey-patches `v8DetectionLoss` to add
+`λ · |soft_count − n_gt|`, where `soft_count` is a differentiable NMS-free peak
+count of the P3 score map. Three configurations — λ = 2.0; λ = 0.3; and
+λ = 1.0 with a bounded loss and a 25-epoch warm-up — all **degrade detection
+without improving the count**: at λ = 2.0, count MAE *rises* to 3.2; with the
+warm-up, mAP@50:95 falls 0.74 → 0.56 the moment the count term activates, and no
+later checkpoint beats the pre-warm-up one (count MAE 2.24). The peak-count
+proxy fights YOLO's assigner and NMS structure.
+
+**Conclusion (E → H → H2).** None of the three routes — a post-hoc threshold
+regressor, a threshold-free density model, or an in-training count loss —
+realises the per-image oracle headroom. The detect-then-**global**-threshold
+baseline (count MAE ~2.1) is hard to beat. Two caveats: the oracle uses
+*test-set* GT to pick each image's threshold, so it overstates the achievable
+gain; and a better-engineered count loss (Hungarian-matched, or on a DETR-style
+set predictor that has no assigner/NMS to fight) might still succeed — that is a
+research project, not a benchmark tweak.
 
 **Confidence: high.** Three clean results — learned threshold ≤ global, density
 counter ≈ detector, both ≫ oracle. Single seed for the density model.
@@ -452,7 +466,8 @@ complete.
 | F | StarDist as a second segmentation baseline | §2.7 — is fine-tuned Cellpose representative? | open |
 | G | Match torchvision training effort to YOLO's (aug, schedule) | §2.1 — does the convergence survive equal tuning? | open |
 | H | Count-native density-map model | §2.6 — realise the oracle-threshold headroom (MAE 2.1 → toward 0.4) | **done — §2.6.** Density-map counter (ResNet18 U-Net) reaches test count MAE 1.94 — on par with the detector (2.13), still ≫ oracle (0.36). Neither post-hoc nor count-native reaches the oracle. `bbbc039/count_head.py` |
-| H2 | Count-consistency loss *inside* detector training (differentiable soft-count vs GT count) | §2.6 — the one untried route that operates on the detector's own predictions | open — the last lead on the oracle headroom |
+| H2 | Count-consistency loss *inside* detector training (differentiable soft-count vs GT count) | §2.6 — the one untried route that operates on the detector's own predictions | **done — §2.6.** A peak-count auxiliary loss on YOLO's P3 score map (3 configs, incl. bounded + warm-up) degrades mAP without improving the count. Oracle headroom stays unrealised by all three routes. `compare/followup_h2.py` |
+| H3 | Better-engineered count loss — Hungarian-matched, or on a DETR-style set predictor (no assigner/NMS to fight) | §2.6 — the oracle headroom remains open | open (research-scale) |
 
 ---
 

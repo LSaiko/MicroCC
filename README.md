@@ -100,10 +100,11 @@ to the detectors' swept mAP.
   labellers disagree on 5–6 % of nuclei; the model tops out at ~0.95–0.96 even
   against the friendliest GT.
 - **The counting error is mostly a threshold problem, not a detection problem**
-  ([§2.6](REPORT.md)). A per-image oracle threshold cuts count MAE 2.1 → 0.4.
-  A post-hoc learned threshold *and* a threshold-free density-map counter both
-  fail to reach it (density counter: test MAE 1.94, on par with the detector).
-  The last untried lead is a count-consistency loss inside detector training.
+  ([§2.6](REPORT.md)) — a per-image oracle threshold cuts count MAE 2.1 → 0.4.
+  But **three attempts to realise that headroom all failed**: a post-hoc learned
+  threshold, a threshold-free density-map counter (test MAE 1.94, ~on par with
+  the detector), and a count-consistency loss inside YOLO training (degrades
+  mAP). Detect-then-**global**-threshold is a hard baseline to beat.
 - **Three corrections, each bigger than swapping models:** the detection cap
   (correction 1), the resolution assumption (correction 2, ~+0.01 only), and the
   mask→box GT — rebuilt with watershed instances + a size filter, which lifted
@@ -161,11 +162,13 @@ the obvious next experiment. CPU-only inference is viable for one-off counts
    headroom, but a post-hoc threshold regressor fails.
 9. ~~**Count-native density model (follow-up H).**~~ ✅ Test MAE 1.94, on par with
    the detector, still far from the oracle.
-10. **Count-consistency loss inside detector training** — the last untried route
-    to the oracle headroom (operates on the detector's own predictions).
-11. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU.
-12. **Tiling (SAHI)** — 512 px tiles, 20 % overlap.
-13. **StarDist** as a second segmentation baseline.
+10. ~~**Count-consistency loss inside YOLO training (follow-up H2).**~~ ✅ A
+    peak-count auxiliary loss degrades mAP without helping the count.
+11. **Better-engineered count loss** — Hungarian-matched, or on a DETR-style set
+    predictor (research-scale; the oracle headroom is still open).
+12. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU.
+13. **Tiling (SAHI)** — 512 px tiles, 20 % overlap.
+14. **StarDist** as a second segmentation baseline.
 
 Full study, corrections, and per-model detail: [compare/RESULTS.md](compare/RESULTS.md).
 

@@ -1,0 +1,8 @@
+{
+  "checkpoint": "runs/detect/runs/yolo_h2_s0/weights/best.pt",
+  "lam": 1.0,
+  "best_conf": 0.45,
+  "count_MAE": 2.24,
+  "count_MAPE": 3.19,
+  "bias": -6
+}
