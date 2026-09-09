@@ -196,11 +196,36 @@ Result:
 | YOLOv8s count bias | +84 | **−5** (over 3 853) |
 
 **Conclusion.** GT construction moved the standings more than any architecture
-choice. The F1 ceiling rose ~2 points; the residual gap to 1.0 is now mostly
-genuine model error plus the still-imperfect mask→box conversion.
+choice. The F1 ceiling rose ~2 points.
 
-**Confidence: high** for "GT quality matters" and the direction of every change;
-**medium** for exact magnitudes (single run per model).
+**Follow-up D — how much of the residual is label vs. model?** No human
+annotator, so we triangulated the GT on the official test split with a second
+independent labeller: a Cellpose model fine-tuned **only on the official 100
+train images** (never saw the test set).
+
+| | count | disagreement with the other |
+|---|---|---|
+| watershed GT (current) | 4 544 | 230 nuclei not in Cellpose (**5.1 %**) |
+| Cellpose GT (independent) | 4 598 | 284 nuclei not in watershed (**6.2 %**) |
+| consensus (matched IoU ≥ 0.5) | 4 314 | — |
+
+Model F1@0.5 (best over conf), scored against each:
+
+| | vs watershed | vs consensus | vs Cellpose |
+|---|---|---|---|
+| YOLOv8s | 0.939 | 0.951 | 0.957 |
+| RT-DETR-L | 0.938 | 0.950 | 0.961 |
+
+Two competent labelling methods disagree on ~5–6 % of nuclei — that is the
+**soft label ceiling**. The model scores 0.94 against watershed, ~0.95 against
+consensus, ~0.96 against Cellpose. So of the ~6 F1 points below 1.0, roughly
+**one-third is label ambiguity** (cases where watershed and an independent
+method disagree) and **two-thirds is genuine model / task difficulty** — the
+model still tops out at ~0.95–0.96 even against the friendliest GT. Generic SAM
+(everything-mode) is useless here: mean |SAM count − watershed| = 37.
+
+**Confidence: high** for the direction; the label-vs-model split is approximate
+(one alternative labeller, single model seed).
 
 ### 2.5 mAP@50 does not rank the deployed task metric
 
@@ -235,7 +260,28 @@ at all.
 hyperparameter that changes count MAE by 2–3× between "default" and "swept."
 Sweep it on a validation set for every model.
 
-**Confidence: high.**
+**Follow-up E — can a *per-image* threshold remove the sweep?** For each image
+the count is a step function of the threshold, so a per-image threshold could
+help. We fit a small regressor (49 official-val images → the per-image threshold
+that hits the GT count, from features of the image and the score distribution)
+and tested on the official test split (YOLOv8s, 3 seeds):
+
+| approach | count MAE (test) |
+|---|---|
+| global threshold (this finding) | **2.13 ± 0.10** |
+| learned per-image threshold (gradient-boosted regressor) | 3.09 ± 0.75 — *worse, unstable* |
+| oracle per-image threshold (lower bound) | **0.36 ± 0.02** |
+
+The oracle shows **~83 % of the count error is "wrong threshold for this
+image"**, not wrong detections — the headroom is real and large. But a naive
+supervised threshold predictor from 50 images does *not* capture it (worse than
+the global threshold, high seed variance). Closing this gap needs a
+threshold-free formulation — a model that outputs a count or a density map
+directly, or a count-consistency term in the training loss — not a post-hoc
+regressor. That is genuine open work.
+
+**Confidence: high.** The negative result (learned threshold ≤ global) and the
+oracle bound are both clean; 3 seeds, official test split.
 
 ### 2.7 Zero-shot performance is not the method's ceiling
 
@@ -361,9 +407,10 @@ too small to trust.)
   tuned; the torchvision models got a light, uniform recipe. "Architecture
   doesn't matter" is really "these architectures with modest, roughly-equal
   effort converge." (Follow-up G.)
-- **GT is still imperfect.** The ~0.90 F1 ceiling is measured against
-  watershed-derived boxes, not gold manual labels. Some of the residual is
-  label error. (Follow-up D.)
+- **GT is still imperfect.** F1 is measured against watershed-derived boxes, not
+  gold human labels. **Follow-up D (§2.4)** bounds this: an independent Cellpose
+  labeller disagrees with the watershed GT on ~5–6 % of nuclei, and ~1/3 of the
+  F1 residual is that ambiguity; the rest is genuine model/task difficulty.
 - **Single training dataset.** The model is trained only on BBBC039 (one cell
   type, stain, magnification, density regime). **Follow-up B (§2.9)** tests
   zero-shot transfer to DSB2018 and bounds this: the conclusions hold within the
@@ -383,10 +430,11 @@ complete.
 | A | Official BBBC039 test split + 3-seed means ± std for YOLOv8s, RT-DETR-L, Faster R-CNN | §2.1 — is the convergence real or noise? | **done** — convergence confirmed; F1@0.5 spread 0.006, σ ≤ 0.004; faint FRCNN ≈ RT-DETR ≳ YOLO ordering (`compare/followup_a.json`) |
 | B | Cross-dataset zero-shot eval (DSB2018 / BBBC038) | generalisation — is the counter fit to this stain/density? | **done — §2.9.** Transfers within fluorescence (7–9% count error on the same assay family, 37–43% on far fluorescence); breaks on H&E/brightfield; RT-DETR generalises far better than YOLO (F1 0.80 vs 0.67 out-of-domain). `compare/followup_b.json` |
 | C | Controlled NMS-free test: matched detection budgets, swept NMS IoU | §2.8 — true size of RT-DETR's recall advantage | **done — §2.8.** No NMS-free advantage: NMS suppresses 0.0–0.3 % of correct detections; strict NMS (IoU 0.30) is best; RT-DETR-L (F1 0.938) sits *behind* RetinaNet (0.948) and FCOS (0.957). The round-1–2 lead was 100 % the detection-cap confound. `compare/followup_c.json` |
-| D | Gold labels on a 10–20 image subset (manual or SAM-assisted); re-measure the F1 ceiling | §2.4 — how much residual is model vs. label | open |
-| E | Count-calibrated training: count-consistency loss or learned per-image threshold | §2.6 — remove the post-hoc sweep | open |
+| D | Independent labeller (Cellpose trained on official-train only) as a second GT; re-measure the F1 ceiling | §2.4 — how much residual is model vs. label | **done — §2.4.** Labellers disagree on 5–6 % of nuclei; ~1/3 of the F1 residual is label ambiguity, ~2/3 genuine model/task difficulty. `compare/followup_d.json` |
+| E | Learned per-image confidence threshold | §2.6 — remove the post-hoc sweep | **done — §2.6.** Oracle per-image threshold cuts count MAE 2.13 → 0.36 (huge headroom), but a supervised threshold regressor from 50 val images does *worse* than the global threshold. Needs a count-native model or a training-time count loss. `compare/followup_e.json` |
 | F | StarDist as a second segmentation baseline | §2.7 — is fine-tuned Cellpose representative? | open |
 | G | Match torchvision training effort to YOLO's (aug, schedule) | §2.1 — does the convergence survive equal tuning? | open |
+| H | Count-native model (density-map regression head, or a count-consistency loss in training) | §2.6 — realise the oracle-threshold headroom (MAE 2.1 → toward 0.4) | open — E showed the post-hoc route fails |
 
 ---
 

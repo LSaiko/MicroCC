@@ -1,0 +1,56 @@
+{
+  "YOLOv8s": {
+    "per_seed": [
+      {
+        "global_conf": 0.425,
+        "MAE_global": 2.16,
+        "MAE_learned": 4.14,
+        "MAE_oracle": 0.38,
+        "MAPE_global": 3.37,
+        "MAPE_learned": 4.92
+      },
+      {
+        "global_conf": 0.4,
+        "MAE_global": 2.24,
+        "MAE_learned": 2.46,
+        "MAE_oracle": 0.36,
+        "MAPE_global": 3.79,
+        "MAPE_learned": 3.82
+      },
+      {
+        "global_conf": 0.425,
+        "MAE_global": 2.0,
+        "MAE_learned": 2.66,
+        "MAE_oracle": 0.34,
+        "MAPE_global": 3.03,
+        "MAPE_learned": 3.58
+      }
+    ],
+    "agg": {
+      "global_conf": {
+        "mean": 0.417,
+        "std": 0.012
+      },
+      "MAE_global": {
+        "mean": 2.133,
+        "std": 0.1
+      },
+      "MAE_learned": {
+        "mean": 3.087,
+        "std": 0.749
+      },
+      "MAE_oracle": {
+        "mean": 0.36,
+        "std": 0.016
+      },
+      "MAPE_global": {
+        "mean": 3.397,
+        "std": 0.311
+      },
+      "MAPE_learned": {
+        "mean": 4.107,
+        "std": 0.583
+      }
+    }
+  }
+}

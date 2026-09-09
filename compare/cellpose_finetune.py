@@ -30,8 +30,8 @@ def instance_mask(mask_path):
     return lbl
 
 
-def load_split(split, masks_dir):
-    img_dir = pathlib.Path("dataset/images") / split
+def load_split(split, masks_dir, data="dataset"):
+    img_dir = pathlib.Path(data) / "images" / split
     imgs, labels = [], []
     for p in sorted(img_dir.glob("*.png")):
         mp = masks_dir / f"{p.stem}.png"
@@ -50,17 +50,19 @@ def load_split(split, masks_dir):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--masks", type=pathlib.Path, default=pathlib.Path("mask/masks"))
+    ap.add_argument("--data", default="dataset")
+    ap.add_argument("--out", default="compare/runs/cellpose_ft")
     ap.add_argument("--epochs", type=int, default=150)
     ap.add_argument("--lr", type=float, default=0.0005)
     args = ap.parse_args()
 
     from cellpose import models, train
 
-    tr_x, tr_y = load_split("train", args.masks)
-    va_x, va_y = load_split("val", args.masks)
+    tr_x, tr_y = load_split("train", args.masks, args.data)
+    va_x, va_y = load_split("val", args.masks, args.data)
     print(f"train {len(tr_x)} imgs, val {len(va_x)} imgs")
 
-    out = pathlib.Path("compare/runs/cellpose_ft")
+    out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     model = models.CellposeModel(gpu=torch.cuda.is_available(), model_type="nuclei")
 

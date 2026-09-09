@@ -96,6 +96,13 @@ to the detectors' swept mAP.
   looked like a paradigm loss; fine-tuned on the same 158 images it posts the
   **best F1@0.5 of any model (0.903)**. "Detection beats segmentation" was an
   out-of-domain artifact.
+- **The F1 ceiling is ~1/3 label, ~2/3 model** ([§2.4](REPORT.md)). Two competent
+  labellers disagree on 5–6 % of nuclei; the model tops out at ~0.95–0.96 even
+  against the friendliest GT.
+- **The counting error is mostly a threshold problem, not a detection problem**
+  ([§2.6](REPORT.md)). A per-image oracle threshold cuts count MAE 2.1 → 0.4 —
+  but a post-hoc learned threshold fails; realising that headroom needs a
+  count-native model.
 - **Three corrections, each bigger than swapping models:** the detection cap
   (correction 1), the resolution assumption (correction 2, ~+0.01 only), and the
   mask→box GT — rebuilt with watershed instances + a size filter, which lifted
@@ -147,12 +154,15 @@ the obvious next experiment. CPU-only inference is viable for one-off counts
    H&E/brightfield.
 6. ~~**Controlled NMS-free test (follow-up C).**~~ ✅ No NMS-free advantage on
    BBBC039; the earlier recall lead was the detection-cap confound.
-7. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU.
-8. **Tiling (SAHI)** — 512 px tiles, 20 % overlap; may lift recall on the
-   densest fields without more resolution.
-9. **Count-calibrated training** — a count-consistency loss or learned per-image
-   threshold, so the model optimises the deployed metric directly.
-10. **StarDist** as a second segmentation baseline.
+7. ~~**Label-vs-model residual (follow-up D).**~~ ✅ Independent labellers disagree
+   on 5–6 % of nuclei; ~1/3 of the F1 residual is label ambiguity, ~2/3 model.
+8. ~~**Learned per-image threshold (follow-up E).**~~ ✅ Oracle shows ~6× count-MAE
+   headroom, but a post-hoc threshold regressor fails — needs a count-native model.
+9. **Count-native model** — a density-map regression head or a count-consistency
+   training loss, to realise the oracle-threshold headroom (E's follow-on).
+10. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU.
+11. **Tiling (SAHI)** — 512 px tiles, 20 % overlap.
+12. **StarDist** as a second segmentation baseline.
 
 Full study, corrections, and per-model detail: [compare/RESULTS.md](compare/RESULTS.md).
 

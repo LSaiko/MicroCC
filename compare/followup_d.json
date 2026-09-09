@@ -1,0 +1,23 @@
+{
+  "gt_counts": {
+    "watershed": 4544,
+    "cellpose": 4598,
+    "consensus": 4314
+  },
+  "gt_disagreement": {
+    "watershed_only_pct": 5.1,
+    "cellpose_only_pct": 6.2
+  },
+  "F1@0.5": {
+    "YOLOv8s": {
+      "watershed": 0.9392,
+      "cellpose": 0.9565,
+      "consensus": 0.951
+    },
+    "RT-DETR-L": {
+      "watershed": 0.9381,
+      "cellpose": 0.9605,
+      "consensus": 0.9496
+    }
+  }
+}
