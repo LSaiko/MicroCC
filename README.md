@@ -71,7 +71,10 @@ to the detectors' swept mAP.
   span F1@0.5 0.889–0.903 and count MAE 1.5–2.6. A 3-seed run on the **official
   test split** ([REPORT.md §2.1](REPORT.md)) confirms it: F1@0.5 0.937–0.943,
   per-model σ ≤ 0.004; a faint Faster R-CNN ≈ RT-DETR ≳ YOLOv8s ordering (~0.6 pt)
-  that reverses the mAP@50 order.
+  that reverses the mAP@50 order. Re-training the torchvision models with a
+  YOLO-equivalent recipe (strong aug, +50 % epochs) doesn't change it — Faster
+  R-CNN stays at F1 0.943 ([§2.1 follow-up G](REPORT.md)) — so it isn't an
+  under-tuning artifact.
 - **…but architecture *is* the lever for robustness.** Zero-shot on DSB2018
   ([§2.9](REPORT.md)), RT-DETR-L holds F1@0.5 **0.80** on out-of-domain
   fluorescence where YOLOv8s drops to **0.67**. The counter transfers within the
@@ -164,11 +167,14 @@ the obvious next experiment. CPU-only inference is viable for one-off counts
    the detector, still far from the oracle.
 10. ~~**Count-consistency loss inside YOLO training (follow-up H2).**~~ ✅ A
     peak-count auxiliary loss degrades mAP without helping the count.
-11. **Better-engineered count loss** — Hungarian-matched, or on a DETR-style set
+11. ~~**Equal-effort torchvision retrain (follow-up G).**~~ ✅ Strong aug + longer
+    schedule leaves Faster R-CNN's F1@0.5 at 0.943 (RetinaNet slightly worse) —
+    the architecture convergence is not an under-tuning artifact.
+12. **Better-engineered count loss** — Hungarian-matched, or on a DETR-style set
     predictor (research-scale; the oracle headroom is still open).
-12. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU.
-13. **Tiling (SAHI)** — 512 px tiles, 20 % overlap.
-14. **StarDist** as a second segmentation baseline.
+13. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU.
+14. **Tiling (SAHI)** — 512 px tiles, 20 % overlap.
+15. **StarDist** as a second segmentation baseline.
 
 Full study, corrections, and per-model detail: [compare/RESULTS.md](compare/RESULTS.md).
 

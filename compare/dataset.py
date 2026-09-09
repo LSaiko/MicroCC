@@ -7,12 +7,30 @@ normalised) and yields (image_tensor[C,H,W] float 0-1, target dict) where target
 import pathlib
 
 import torch
+from torchvision import tv_tensors
 from torchvision.io import read_image
+from torchvision.transforms import v2
 from torchvision.transforms.v2 import functional as F
 
 
+def _strong_aug():
+    """Follow-up G — heavy augmentation to match YOLO's training effort
+    (photometric distort + flips + rotation + scale jitter + IoU crop + zoom-out)."""
+    return v2.Compose([
+        v2.RandomPhotometricDistort(p=0.5),
+        v2.RandomZoomOut(fill=0, side_range=(1.0, 2.0), p=0.3),
+        v2.RandomIoUCrop(),
+        v2.RandomHorizontalFlip(0.5),
+        v2.RandomVerticalFlip(0.5),
+        v2.RandomApply([v2.RandomRotation(15, expand=False)], p=0.5),
+        v2.ScaleJitter(target_size=(520, 696), scale_range=(0.7, 1.3), antialias=True),
+        v2.ClampBoundingBoxes(),
+        v2.SanitizeBoundingBoxes(min_size=3),
+    ])
+
+
 class YoloDetectionDataset(torch.utils.data.Dataset):
-    def __init__(self, root, split, train=False):
+    def __init__(self, root, split, train=False, aug=None):
         root = pathlib.Path(root)
         self.img_dir = root / "images" / split
         self.lbl_dir = root / "labels" / split
@@ -21,6 +39,7 @@ class YoloDetectionDataset(torch.utils.data.Dataset):
         if not self.imgs:
             raise FileNotFoundError(f"no images in {self.img_dir}")
         self.train = train
+        self.aug = _strong_aug() if aug == "strong" else None
 
     def __len__(self):
         return len(self.imgs)
@@ -44,16 +63,20 @@ class YoloDetectionDataset(torch.utils.data.Dataset):
                 x1, y1 = (cx + bw / 2) * w, (cy + bh / 2) * h
                 boxes.append([x0, y0, x1, y1])
 
-        if self.train and boxes and torch.rand(1).item() < 0.5:   # hflip
-            img = F.hflip(img)
-            boxes = [[w - x1, y0, w - x0, y1] for x0, y0, x1, y1 in boxes]
-
         boxes = torch.tensor(boxes, dtype=torch.float32).reshape(-1, 4)
-        target = {
-            "boxes": boxes,
-            "labels": torch.ones((len(boxes),), dtype=torch.int64),
-        }
-        return img, target
+
+        if self.train and self.aug is not None and len(boxes):
+            bb = tv_tensors.BoundingBoxes(boxes, format="XYXY", canvas_size=(h, w))
+            tgt = {"boxes": bb, "labels": torch.ones(len(boxes), dtype=torch.int64)}
+            img, tgt = self.aug(img, tgt)
+            return img, {"boxes": tgt["boxes"].as_subclass(torch.Tensor).float().reshape(-1, 4),
+                         "labels": tgt["labels"].as_subclass(torch.Tensor).long()}
+
+        if self.train and self.aug is None and len(boxes) and torch.rand(1).item() < 0.5:
+            img = F.hflip(img)
+            boxes = boxes[:, [2, 1, 0, 3]] * torch.tensor([-1., 1, -1, 1]) + torch.tensor([w, 0., w, 0])
+
+        return img, {"boxes": boxes, "labels": torch.ones(len(boxes), dtype=torch.int64)}
 
 
 def collate_fn(batch):

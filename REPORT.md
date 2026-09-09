@@ -18,7 +18,9 @@ across two-stage, one-stage, anchor-free, transformer, and
 fine-tuned-segmentation designs. A 3-seed run on the official test split (§2.1)
 narrows the F1@0.5 spread to 0.006 with a per-model σ ≤ 0.004: a small,
 reproducible edge for the two-stage / transformer models over YOLOv8s that YOLO
-trades for the top mAP@50 and lowest latency. The differences that *did* move
+trades for the top mAP@50 and lowest latency. Re-training the torchvision models
+with a YOLO-equivalent recipe (strong augmentation, longer schedule) leaves that
+picture unchanged (§2.1, follow-up G), so it is not an under-tuning artifact. The differences that *did* move
 the numbers meaningfully were, in order: COCO-inherited per-image detection caps
 (+0.13 mAP@50 on the same weights), ground-truth box construction (F1 ceiling
 0.88 → 0.90, count MAE −40%), and — a distant third — input resolution
@@ -102,6 +104,29 @@ mAP, lowest on F1). The effect is ~0.6 percentage points.
 split used earlier in the study — the official test images are evidently a
 little easier / less dense. Trust the *relative* numbers more than the
 absolutes.)
+
+**Follow-up G (done).** The torchvision models were trained with a deliberately
+light recipe (hflip only, 40 epochs) while YOLO gets ultralytics' full mosaic /
+HSV / scale-jitter pipeline. Does the convergence survive when the gap in
+*training effort* is closed? Re-trained Faster R-CNN and RetinaNet on the
+official split with a YOLO-equivalent recipe — photometric distort + H/V flips +
+±15° rotation + scale jitter + IoU crop + zoom-out, LR warm-up, **60 epochs**
+(+50 %) — and scored through the same harness:
+
+| Model | recipe | F1@0.5 | mAP@50 | count MAE |
+|---|---|---|---|---|
+| Faster R-CNN | light (3-seed, above) | 0.943 ± 0.001 | 0.960 | 1.80 |
+| Faster R-CNN | strong aug + long | **0.943** | 0.968 | 2.12 |
+| RetinaNet | light (official test, §2.8) | 0.948 | 0.950 | 1.64 |
+| RetinaNet | strong aug + long | **0.924** | 0.936 | 3.06 |
+
+Faster R-CNN lands **exactly** on its light-aug number — the two-stage model was
+already at its ceiling with the minimal recipe. RetinaNet got **2.4 points
+worse**: the single-stage focal head is sensitive to the augmentation
+distribution and did not re-converge under a 60-epoch cosine. Either way, more
+tuning effort on the torchvision side does not open or close a gap vs. YOLOv8s
+(0.937) — the §2.1 convergence is **not a "torchvision was under-tuned"
+artifact**.
 
 **Conclusion.** "Architecture barely matters" **holds and is now
 seed-quantified on the canonical benchmark.** "Architecture is irrelevant" does
@@ -435,9 +460,11 @@ too small to trust.)
   Faster R-CNN: 3 seeds on the official 100/50/50 split, scored on the held-out
   test set. RetinaNet, FCOS, and Cellpose are still single-seed.
 - **Asymmetric tuning.** YOLO's augmentation and learning-rate schedule were
-  tuned; the torchvision models got a light, uniform recipe. "Architecture
-  doesn't matter" is really "these architectures with modest, roughly-equal
-  effort converge." (Follow-up G.)
+  tuned; the torchvision models got a light, uniform recipe. **Follow-up G
+  (§2.1)** closes this: giving Faster R-CNN and RetinaNet a YOLO-equivalent
+  recipe (strong aug, +50 % epochs, LR warm-up) leaves Faster R-CNN's F1@0.5
+  unchanged (0.943) and makes RetinaNet slightly worse — the convergence is not
+  an under-tuning artifact.
 - **GT is still imperfect.** F1 is measured against watershed-derived boxes, not
   gold human labels. **Follow-up D (§2.4)** bounds this: an independent Cellpose
   labeller disagrees with the watershed GT on ~5–6 % of nuclei, and ~1/3 of the
@@ -464,7 +491,7 @@ complete.
 | D | Independent labeller (Cellpose trained on official-train only) as a second GT; re-measure the F1 ceiling | §2.4 — how much residual is model vs. label | **done — §2.4.** Labellers disagree on 5–6 % of nuclei; ~1/3 of the F1 residual is label ambiguity, ~2/3 genuine model/task difficulty. `compare/followup_d.json` |
 | E | Learned per-image confidence threshold | §2.6 — remove the post-hoc sweep | **done — §2.6.** Oracle per-image threshold cuts count MAE 2.13 → 0.36 (huge headroom), but a supervised threshold regressor from 50 val images does *worse* than the global threshold. Needs a count-native model or a training-time count loss. `compare/followup_e.json` |
 | F | StarDist as a second segmentation baseline | §2.7 — is fine-tuned Cellpose representative? | open |
-| G | Match torchvision training effort to YOLO's (aug, schedule) | §2.1 — does the convergence survive equal tuning? | open |
+| G | Match torchvision training effort to YOLO's (aug, schedule) | §2.1 — does the convergence survive equal tuning? | **done — §2.1.** Strong aug + 60 ep + LR warm-up: Faster R-CNN F1@0.5 stays at 0.943 (identical to light recipe); RetinaNet drops to 0.924 (focal head sensitive to the aug shift). Not a tuning-effort artifact. `compare/followup_g.json` |
 | H | Count-native density-map model | §2.6 — realise the oracle-threshold headroom (MAE 2.1 → toward 0.4) | **done — §2.6.** Density-map counter (ResNet18 U-Net) reaches test count MAE 1.94 — on par with the detector (2.13), still ≫ oracle (0.36). Neither post-hoc nor count-native reaches the oracle. `bbbc039/count_head.py` |
 | H2 | Count-consistency loss *inside* detector training (differentiable soft-count vs GT count) | §2.6 — the one untried route that operates on the detector's own predictions | **done — §2.6.** A peak-count auxiliary loss on YOLO's P3 score map (3 configs, incl. bounded + warm-up) degrades mAP without improving the count. Oracle headroom stays unrealised by all three routes. `compare/followup_h2.py` |
 | H3 | Better-engineered count loss — Hungarian-matched, or on a DETR-style set predictor (no assigner/NMS to fight) | §2.6 — the oracle headroom remains open | open (research-scale) |
@@ -483,6 +510,7 @@ Follow-ups: `compare/followup_a_{train,eval}.py` (§2.1, official split + seeds)
 `compare/followup_b.py` (§2.9, cross-dataset — needs DSB2018 `stage1_train`:
 `curl -O https://data.broadinstitute.org/bbbc/BBBC038/stage1_train.zip`),
 `compare/followup_{c,d,e}.py` (§2.8 / §2.4 / §2.6),
+`compare/followup_g.py` + `compare/train_tv.py --aug strong --warmup` (§2.1, equal-effort retrain),
 `bbbc039/count_head.py` (§2.6, density-map counter; `test_count_head.py` self-check).
 
 ---

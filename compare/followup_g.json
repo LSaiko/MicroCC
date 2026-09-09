@@ -1,0 +1,24 @@
+{
+  "reference_F1@0.5": {
+    "YOLOv8s (light, 3 seeds)": 0.937,
+    "Faster R-CNN (light, 3 seeds)": 0.943
+  },
+  "runs": {
+    "fasterrcnn (strong-aug)": {
+      "F1@0.5": 0.9431,
+      "mAP50": 0.9684,
+      "mAR500": 0.8506,
+      "best_conf": 0.7,
+      "count_MAE@best": 2.12,
+      "count_MAPE@best_pct": 3.37
+    },
+    "retinanet (strong-aug)": {
+      "F1@0.5": 0.9245,
+      "mAP50": 0.936,
+      "mAR500": 0.8455,
+      "best_conf": 0.45,
+      "count_MAE@best": 3.06,
+      "count_MAPE@best_pct": 4.02
+    }
+  }
+}

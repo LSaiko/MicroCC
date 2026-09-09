@@ -79,6 +79,9 @@ def main():
     ap.add_argument("--tag", default="", help="output dir suffix, e.g. '1280'")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--lr", type=float, default=5e-3)
+    ap.add_argument("--aug", choices=["none", "strong"], default="none",
+                    help="'strong' = YOLO-equivalent augmentation (follow-up G)")
+    ap.add_argument("--warmup", type=int, default=0, help="linear LR warm-up iters")
     ap.add_argument("--device", default="cuda")
     args = ap.parse_args()
 
@@ -90,7 +93,7 @@ def main():
     out = pathlib.Path("compare/runs") / (args.model + (f"_{args.tag}" if args.tag else ""))
     out.mkdir(parents=True, exist_ok=True)
 
-    tr = YoloDetectionDataset(args.data, "train", train=True)
+    tr = YoloDetectionDataset(args.data, "train", train=True, aug=args.aug)
     va = YoloDetectionDataset(args.data, "val", train=False)
     tl = torch.utils.data.DataLoader(tr, batch_size=args.batch, shuffle=True,
                                      num_workers=0, collate_fn=collate_fn)
@@ -100,7 +103,11 @@ def main():
     model = build(args.model, args.imgsz or None).to(device)
     opt = torch.optim.SGD([p for p in model.parameters() if p.requires_grad],
                           lr=args.lr, momentum=0.9, weight_decay=5e-4)
-    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, args.epochs)
+    scheds = [torch.optim.lr_scheduler.CosineAnnealingLR(opt, args.epochs)]
+    if args.warmup:
+        scheds.append(torch.optim.lr_scheduler.LinearLR(
+            opt, start_factor=0.01, total_iters=args.warmup))
+    sched = torch.optim.lr_scheduler.ChainedScheduler(scheds) if args.warmup else scheds[0]
     scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
 
     best = -1.0
