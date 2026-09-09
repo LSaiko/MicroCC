@@ -527,7 +527,64 @@ complete.
 
 ---
 
-## 5. Reproduce
+## 5. Toward a robustness-oriented counter
+
+The study's headline — architecture barely matters — is an **in-domain** result
+(§2.1). The moment the input leaves BBBC039's assay, model choice starts to
+matter (§2.9: RT-DETR-L holds F1 0.80 on far fluorescence where YOLOv8s drops to
+0.67) and imaging-modality shift breaks every model. If the goal changes from
+"best on BBBC039" to "a counter that survives a new microscope," the leverage
+moves to **training data**, not the model. Concrete next steps, roughly in
+order of expected return:
+
+1. **Multi-dataset fluorescence training.** Pool BBBC039 with the fluorescence
+   subset of DSB2018/BBBC038, plus **BBBC038 stage-1 test**, **Cellpose's
+   generalist nuclei set**, and the **NeurIPS 2022 Cell Segmentation Challenge**
+   data. Train on the union, hold out one dataset at a time (leave-one-dataset-out)
+   and re-run `compare/followup_b.py`'s buckets. Expected: the fluor-far F1 gap
+   (0.67–0.80 → ?) closes substantially; this is the single highest-value
+   experiment. Watch for the density-regime mismatch — BBBC039 is ~100
+   nuclei/image, DSB2018 tiles are often < 20 — so normalise by re-tiling to a
+   common object-per-image range rather than feeding raw images.
+2. **Contrast-inversion augmentation for modality transfer.** §2.9's H&E /
+   brightfield failure is largely a sign flip (dark nuclei on light). Add
+   `RandomInvert`, per-channel gamma, and **stain-style augmentation** (RandAugment
+   for histology, or a quick CycleGAN fluor↔H&E) to the training recipe and
+   re-test zero-shot on brightfield. Cheap; may recover the 0.10 → 0.4–0.5 range
+   without any new labels.
+3. **Modality-balanced sampling + a modality-conditioned normaliser.** If (1)
+   pools modalities, oversample the rare ones and prepend a learned per-image
+   normalisation (predict invert/scale from a thumbnail) so one set of weights
+   spans fluorescence + brightfield.
+4. **Self-supervised pretraining on unlabelled microscopy.** A masked-autoencoder
+   or DINO backbone pretrained on a large unlabelled cell-image corpus (e.g.
+   the RxRx / JUMP-CP collections), then fine-tuned on the pooled labelled set.
+   Targets the OOD gap at the representation level rather than the augmentation
+   level.
+5. **Detector + segmentation ensemble.** §2.9 (RT-DETR robust OOD) and §2.7
+   (fine-tuned Cellpose best in-domain) point at a two-model ensemble: run both,
+   reconcile by IoU, fall back to the more confident head per image. Quantify
+   whether it beats either alone across the buckets.
+6. **Capacity vs. OOD.** Is RT-DETR's out-of-domain lead the transformer
+   inductive bias or just parameter count? Re-run §2.9 with YOLOv8m/l and
+   RT-DETR-X. If a larger YOLO closes the gap, the §2.9 story is "capacity," not
+   "architecture."
+7. **Synthetic density augmentation.** BBBC005 (synthetic, known count) and
+   copy-paste augmentation (splice extra nuclei into real fields) to push past
+   BBBC039's 40–165 nuclei/image range and test whether the counter degrades
+   gracefully at 300+.
+8. **A human-labelled test set.** Every F1 ceiling in this report is against
+   watershed or Cellpose GT (§2.4: ~1/3 of the residual is label ambiguity).
+   One hand-annotated 25-image test set would let the robustness work be
+   measured against a real ceiling.
+
+Harness note: `compare/eval_all.py` and `compare/followup_b.py` already accept
+arbitrary YOLO-format dataset roots, so (1) is mostly a data-assembly script
+plus a leave-one-out loop — no new evaluation code.
+
+---
+
+## 6. Reproduce
 
 Full pipeline, per-model training commands, and the raw results table are in
 [`compare/RESULTS.md`](compare/RESULTS.md). Harness: `compare/eval_all.py`

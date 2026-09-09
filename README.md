@@ -181,6 +181,27 @@ the obvious next experiment. CPU-only inference is viable for one-off counts
 14. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU.
 15. **Tiling (SAHI)** — 512 px tiles, 20 % overlap.
 
+**Robustness / multi-dataset training** (the highest-value direction — the
+architecture-equivalence result is *in-domain only*; see [REPORT.md §5](REPORT.md)):
+
+16. **Multi-dataset fluorescence training** — pool BBBC039 + DSB2018 fluorescence
+    + Cellpose generalist + NeurIPS 2022 Cell-Seg, normalise to a common
+    objects-per-image range, train on the union, evaluate leave-one-dataset-out.
+    Expected to close the fluor-far F1 gap (0.67–0.80).
+17. **Contrast-inversion / stain augmentation** — `RandomInvert` + gamma +
+    histology-style aug to recover the H&E / brightfield failure (§2.9) without
+    new labels.
+18. **Self-supervised backbone** (MAE / DINO) pretrained on unlabelled microscopy
+    (RxRx, JUMP-CP), then fine-tuned on the pooled labelled set.
+19. **RT-DETR + fine-tuned-Cellpose ensemble** — robust OOD detector + best
+    in-domain segmenter, reconciled by IoU.
+20. **Capacity vs. OOD** — re-run §2.9 with YOLOv8m/l and RT-DETR-X: is
+    RT-DETR's out-of-domain lead the transformer bias or just parameter count?
+21. **Synthetic density augmentation** (BBBC005, copy-paste nuclei) to test
+    graceful degradation past 165 nuclei/image.
+22. **A hand-labelled 25-image test set** — every F1 ceiling here is against
+    watershed/Cellpose GT (§2.4).
+
 Full study, corrections, and per-model detail: [compare/RESULTS.md](compare/RESULTS.md).
 
 ![training curves](showcase/training_curves.png)
