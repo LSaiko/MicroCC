@@ -88,6 +88,10 @@ to the detectors' swept mAP.
   count column.
 - **Confidence calibration is per-model** (optimal 0.40–0.70). Hard-coding
   `conf=0.5` and swapping detectors counts wrong.
+- **"NMS-free" is not an advantage here** ([§2.8](REPORT.md)). NMS suppresses
+  0.0–0.3 % of correct detections on BBBC039; strict NMS (IoU 0.30) is optimal;
+  NMS-free RT-DETR-L sits *behind* RetinaNet and FCOS in-domain. RT-DETR's earlier
+  "recall lead" was entirely the detection-cap confound.
 - **Zero-shot ≠ the ceiling.** Off-the-shelf Cellpose (F1 0.78, count MAE 16)
   looked like a paradigm loss; fine-tuned on the same 158 images it posts the
   **best F1@0.5 of any model (0.903)**. "Detection beats segmentation" was an
@@ -141,12 +145,14 @@ the obvious next experiment. CPU-only inference is viable for one-off counts
 5. ~~**Cross-dataset generalisation (follow-up B).**~~ ✅ Transfers within
    fluorescence; RT-DETR far more robust than YOLO out-of-domain; breaks on
    H&E/brightfield.
-6. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU.
-7. **Tiling (SAHI)** — 512 px tiles, 20 % overlap; may lift recall on the
+6. ~~**Controlled NMS-free test (follow-up C).**~~ ✅ No NMS-free advantage on
+   BBBC039; the earlier recall lead was the detection-cap confound.
+7. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU.
+8. **Tiling (SAHI)** — 512 px tiles, 20 % overlap; may lift recall on the
    densest fields without more resolution.
-8. **Count-calibrated training** — a count-consistency loss or learned per-image
+9. **Count-calibrated training** — a count-consistency loss or learned per-image
    threshold, so the model optimises the deployed metric directly.
-9. **StarDist** as a second segmentation baseline.
+10. **StarDist** as a second segmentation baseline.
 
 Full study, corrections, and per-model detail: [compare/RESULTS.md](compare/RESULTS.md).
 

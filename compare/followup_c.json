@@ -1,0 +1,99 @@
+{
+  "RT-DETR-L (NMS-free)": {
+    "best_conf": 0.7,
+    "F1@0.5": 0.9381,
+    "recall@0.5": 0.9351,
+    "count_MAE": 2.1,
+    "nms": "none (set prediction)"
+  },
+  "retinanet": {
+    "suppression": {
+      "recall_no_nms": 0.9509,
+      "recall_nms0.5": 0.948,
+      "suppression_loss": 0.0029
+    },
+    "nms_sweep": {
+      "0.30": {
+        "best_conf": 0.45,
+        "F1@0.5": 0.9484,
+        "recall@0.5": 0.9463,
+        "count_MAE": 1.64
+      },
+      "0.45": {
+        "best_conf": 0.55,
+        "F1@0.5": 0.9428,
+        "recall@0.5": 0.9371,
+        "count_MAE": 2.24
+      },
+      "0.60": {
+        "best_conf": 0.55,
+        "F1@0.5": 0.9328,
+        "recall@0.5": 0.9388,
+        "count_MAE": 2.34
+      },
+      "0.75": {
+        "best_conf": 0.6,
+        "F1@0.5": 0.9236,
+        "recall@0.5": 0.9277,
+        "count_MAE": 3.18
+      },
+      "0.90": {
+        "best_conf": 0.65,
+        "F1@0.5": 0.8918,
+        "recall@0.5": 0.9117,
+        "count_MAE": 5.3
+      },
+      "0.99": {
+        "best_conf": 0.8,
+        "F1@0.5": 0.207,
+        "recall@0.5": 0.8368,
+        "count_MAE": 526.52
+      }
+    }
+  },
+  "fcos": {
+    "suppression": {
+      "recall_no_nms": 0.9454,
+      "recall_nms0.5": 0.9451,
+      "suppression_loss": 0.0003
+    },
+    "nms_sweep": {
+      "0.30": {
+        "best_conf": 0.45,
+        "F1@0.5": 0.9573,
+        "recall@0.5": 0.9555,
+        "count_MAE": 1.82
+      },
+      "0.45": {
+        "best_conf": 0.5,
+        "F1@0.5": 0.9553,
+        "recall@0.5": 0.944,
+        "count_MAE": 2.64
+      },
+      "0.60": {
+        "best_conf": 0.5,
+        "F1@0.5": 0.9545,
+        "recall@0.5": 0.9452,
+        "count_MAE": 2.58
+      },
+      "0.75": {
+        "best_conf": 0.5,
+        "F1@0.5": 0.9509,
+        "recall@0.5": 0.9454,
+        "count_MAE": 2.2
+      },
+      "0.90": {
+        "best_conf": 0.5,
+        "F1@0.5": 0.9434,
+        "recall@0.5": 0.9454,
+        "count_MAE": 2.4
+      },
+      "0.99": {
+        "best_conf": 0.7,
+        "F1@0.5": 0.6616,
+        "recall@0.5": 0.6916,
+        "count_MAE": 16.94
+      }
+    }
+  }
+}

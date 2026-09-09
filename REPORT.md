@@ -257,23 +257,52 @@ segmentation" was never true here.
 **Confidence: high** for the direction; **medium** for whether fine-tuned
 Cellpose's small F1 lead is real (0.903 vs 0.900, within noise).
 
-### 2.8 The NMS-free advantage was partly an upstream artifact
+### 2.8 There is no NMS-free advantage on this task — the earlier appearance of one was entirely the detection-cap confound
 
-**Claim.** RT-DETR-L's recall lead in the earlier rounds shrank once the other
-models were un-throttled.
+**Claim.** On BBBC039, RT-DETR-L's "NMS-free" set prediction gives it **zero**
+recall or F1 advantage over a properly-configured anchor-based detector.
 
-**Path.** Before the cap fix (§2.2), RT-DETR-L's mAR@500 was 0.910 vs. ~0.80 for
-everyone else, and we credited its NMS-free set prediction ("NMS discards a box
-that overlaps a higher-scoring one, and confluent nuclei overlap"). After the
-caps were raised, FCOS reached mAR@500 0.911 and RetinaNet 0.874 — the gap
-narrowed to a few points.
+**Path.** Rounds 1–2: RT-DETR-L's mAR@500 was 0.910 vs. ~0.80 for everyone else,
+and we credited its NMS-free design ("NMS discards a box that overlaps a
+higher-scoring one, and confluent nuclei overlap"). **Follow-up C** tests this
+directly on the official test split, anchor-based caps raised so NMS IoU is the
+only variable:
 
-**Conclusion.** NMS-free prediction is a real, sensible property for dense
-fields, but most of the apparent advantage was the anchor-based models being
-capped upstream of NMS. A cleaner test (matched detection budgets, controlled
-NMS IoU) is needed to size the true effect.
+*Direct measurement — GT nuclei with an IoU ≥ 0.5 match before NMS that lose it
+after NMS, at a fixed confidence:*
 
-**Confidence: low.** Confounded; flagged as a follow-up.
+| | recall, NMS off | recall, NMS @ 0.5 | suppressed |
+|---|---|---|---|
+| RetinaNet | 0.951 | 0.948 | **0.003** |
+| FCOS | 0.945 | 0.945 | **0.000** |
+
+*NMS IoU sweep (F1@0.5 / recall / count MAE at each model's best confidence):*
+
+| NMS IoU | RetinaNet F1 / rec | FCOS F1 / rec |
+|---|---|---|
+| **0.30** (strict) | **0.948 / 0.946** | **0.957 / 0.956** |
+| 0.50 (default) | 0.943 / 0.937 | 0.955 / 0.944 |
+| 0.75 | 0.924 / 0.928 | 0.951 / 0.945 |
+| 0.90 | 0.892 / 0.912 | 0.943 / 0.945 |
+| 0.99 (≈off) | 0.207 / 0.837 | 0.662 / 0.692 |
+
+RT-DETR-L (NMS-free): F1@0.5 **0.938**, recall **0.935**, count MAE 2.10.
+
+**Conclusions.**
+- **NMS suppresses essentially no correct detections here** (0.0–0.3 % of GT).
+  BBBC039 nuclei — even confluent ones, with the watershed boxes — rarely
+  overlap past IoU 0.5, so NMS almost never fires between two real nuclei.
+- **Loosening NMS monotonically *hurts* F1** — it keeps duplicates (precision
+  cost) without recovering meaningful recall. The best NMS IoU tried is the
+  strictest (0.30).
+- **RT-DETR-L has no recall or F1 edge** — it is in fact 1–2 points *behind*
+  both anchor-based detectors on this in-domain test (F1 0.938 vs 0.948 / 0.957).
+- **This fully explains the round-1–2 illusion:** RT-DETR's mAR lead was 100 %
+  the anchor-based models being capped upstream of NMS (§2.2). RT-DETR's real,
+  separate advantage is **out-of-domain robustness (§2.9)** — unrelated to NMS.
+
+**Confidence: high.** Directly measured, single-variable NMS sweep, direct
+pre/post-NMS recall comparison. Single seed for RetinaNet/FCOS.
 
 ### 2.9 Cross-dataset: the counter transfers within fluorescence, and RT-DETR transfers *much* better
 
@@ -306,9 +335,10 @@ too small to trust.)
   not broken.
 - **RT-DETR-L generalises much better than YOLOv8s** — fluor-far F1 0.80 vs 0.67,
   count MAE 4.7 vs 8.5. **This gap does not exist in-domain** (§2.1: 0.941 vs
-  0.937). Under distribution shift the transformer / NMS-free set-prediction
-  model is clearly the more robust choice. The "architecture barely matters"
-  conclusion is *in-domain only*.
+  0.937). Under distribution shift the transformer model is clearly the more
+  robust choice — and this, not NMS-free prediction (§2.8), is RT-DETR's one
+  real advantage in the study. The "architecture barely matters" conclusion is
+  *in-domain only*.
 - **Imaging-modality shift breaks it**, as expected — dark-nuclei-on-light
   (H&E, brightfield) is inverted contrast the model never saw. RT-DETR salvages
   partial signal; YOLO essentially fails.
@@ -352,7 +382,7 @@ complete.
 |---|---|---|---|
 | A | Official BBBC039 test split + 3-seed means ± std for YOLOv8s, RT-DETR-L, Faster R-CNN | §2.1 — is the convergence real or noise? | **done** — convergence confirmed; F1@0.5 spread 0.006, σ ≤ 0.004; faint FRCNN ≈ RT-DETR ≳ YOLO ordering (`compare/followup_a.json`) |
 | B | Cross-dataset zero-shot eval (DSB2018 / BBBC038) | generalisation — is the counter fit to this stain/density? | **done — §2.9.** Transfers within fluorescence (7–9% count error on the same assay family, 37–43% on far fluorescence); breaks on H&E/brightfield; RT-DETR generalises far better than YOLO (F1 0.80 vs 0.67 out-of-domain). `compare/followup_b.json` |
-| C | Controlled NMS-free test: matched detection budgets, swept NMS IoU | §2.8 — true size of RT-DETR's recall advantage | open |
+| C | Controlled NMS-free test: matched detection budgets, swept NMS IoU | §2.8 — true size of RT-DETR's recall advantage | **done — §2.8.** No NMS-free advantage: NMS suppresses 0.0–0.3 % of correct detections; strict NMS (IoU 0.30) is best; RT-DETR-L (F1 0.938) sits *behind* RetinaNet (0.948) and FCOS (0.957). The round-1–2 lead was 100 % the detection-cap confound. `compare/followup_c.json` |
 | D | Gold labels on a 10–20 image subset (manual or SAM-assisted); re-measure the F1 ceiling | §2.4 — how much residual is model vs. label | open |
 | E | Count-calibrated training: count-consistency loss or learned per-image threshold | §2.6 — remove the post-hoc sweep | open |
 | F | StarDist as a second segmentation baseline | §2.7 — is fine-tuned Cellpose representative? | open |
