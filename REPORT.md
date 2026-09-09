@@ -275,13 +275,30 @@ and tested on the official test split (YOLOv8s, 3 seeds):
 The oracle shows **~83 % of the count error is "wrong threshold for this
 image"**, not wrong detections — the headroom is real and large. But a naive
 supervised threshold predictor from 50 images does *not* capture it (worse than
-the global threshold, high seed variance). Closing this gap needs a
-threshold-free formulation — a model that outputs a count or a density map
-directly, or a count-consistency term in the training loss — not a post-hoc
-regressor. That is genuine open work.
+the global threshold, high seed variance).
 
-**Confidence: high.** The negative result (learned threshold ≤ global) and the
-oracle bound are both clean; 3 seeds, official test split.
+**Follow-up H — does a threshold-free, count-native model reach the oracle?** We
+trained a small density-map regressor (ResNet18 U-Net, `bbbc039/count_head.py`)
+directly on the official 100-image train split — a unit-mass Gaussian per
+nucleus centroid, count = the map's integral, no detection / NMS / threshold.
+
+| model | count MAE — official test | MAPE |
+|---|---|---|
+| detector + global threshold | 2.13 | 3.4 % |
+| **density-map counter** | **1.94** | 3.0 % |
+| oracle per-image threshold (LB) | 0.36 | — |
+
+The count-native model is **on par with the detector** (marginally better on
+test, worse on the harder val split — MAE 3.4) and, like the post-hoc route,
+**does not approach the oracle**. So neither dropping detection entirely nor a
+post-hoc threshold closes the 2.1 → 0.4 gap. What remains untried is a
+*count-consistency loss inside detector training* (differentiable soft-count vs.
+GT count), which is the one route that operates on the detector's own predictions
+where the oracle headroom lives. That needs hooking the training loss and is
+left as further work.
+
+**Confidence: high.** Three clean results — learned threshold ≤ global, density
+counter ≈ detector, both ≫ oracle. Single seed for the density model.
 
 ### 2.7 Zero-shot performance is not the method's ceiling
 
@@ -434,7 +451,8 @@ complete.
 | E | Learned per-image confidence threshold | §2.6 — remove the post-hoc sweep | **done — §2.6.** Oracle per-image threshold cuts count MAE 2.13 → 0.36 (huge headroom), but a supervised threshold regressor from 50 val images does *worse* than the global threshold. Needs a count-native model or a training-time count loss. `compare/followup_e.json` |
 | F | StarDist as a second segmentation baseline | §2.7 — is fine-tuned Cellpose representative? | open |
 | G | Match torchvision training effort to YOLO's (aug, schedule) | §2.1 — does the convergence survive equal tuning? | open |
-| H | Count-native model (density-map regression head, or a count-consistency loss in training) | §2.6 — realise the oracle-threshold headroom (MAE 2.1 → toward 0.4) | open — E showed the post-hoc route fails |
+| H | Count-native density-map model | §2.6 — realise the oracle-threshold headroom (MAE 2.1 → toward 0.4) | **done — §2.6.** Density-map counter (ResNet18 U-Net) reaches test count MAE 1.94 — on par with the detector (2.13), still ≫ oracle (0.36). Neither post-hoc nor count-native reaches the oracle. `bbbc039/count_head.py` |
+| H2 | Count-consistency loss *inside* detector training (differentiable soft-count vs GT count) | §2.6 — the one untried route that operates on the detector's own predictions | open — the last lead on the oracle headroom |
 
 ---
 
@@ -448,7 +466,9 @@ Full pipeline, per-model training commands, and the raw results table are in
 
 Follow-ups: `compare/followup_a_{train,eval}.py` (§2.1, official split + seeds),
 `compare/followup_b.py` (§2.9, cross-dataset — needs DSB2018 `stage1_train`:
-`curl -O https://data.broadinstitute.org/bbbc/BBBC038/stage1_train.zip`).
+`curl -O https://data.broadinstitute.org/bbbc/BBBC038/stage1_train.zip`),
+`compare/followup_{c,d,e}.py` (§2.8 / §2.4 / §2.6),
+`bbbc039/count_head.py` (§2.6, density-map counter; `test_count_head.py` self-check).
 
 ---
 
