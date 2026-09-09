@@ -12,10 +12,14 @@ We trained five object detectors (YOLOv8s, RT-DETR-L, Faster R-CNN, RetinaNet,
 FCOS) and a segmentation model (Cellpose, zero-shot and fine-tuned) to count
 cell nuclei in the BBBC039 fluorescence-microscopy dataset, and scored all of
 them through a single evaluation harness. **At each model's tuned operating
-point, every trained model reaches F1@0.5 ≈ 0.89–0.90 and count MAE 1.5–2.6
-nuclei/image** — a 0.014 F1 spread across two-stage, one-stage, anchor-free,
-transformer, and fine-tuned-segmentation designs. The differences that *did*
-move the numbers were, in order: COCO-inherited per-image detection caps
+point, every trained model reaches F1@0.5 ≈ 0.89–0.90** (custom val split;
+0.94 on the official test split) **and count MAE 1.5–2.6 nuclei/image** —
+across two-stage, one-stage, anchor-free, transformer, and
+fine-tuned-segmentation designs. A 3-seed run on the official test split (§2.1)
+narrows the F1@0.5 spread to 0.006 with a per-model σ ≤ 0.004: a small,
+reproducible edge for the two-stage / transformer models over YOLOv8s that YOLO
+trades for the top mAP@50 and lowest latency. The differences that *did* move
+the numbers meaningfully were, in order: COCO-inherited per-image detection caps
 (+0.13 mAP@50 on the same weights), ground-truth box construction (F1 ceiling
 0.88 → 0.90, count MAE −40%), and — a distant third — input resolution
 (≈ +0.01 mAP@50). We reached the headline conclusion twice by mistake before
@@ -75,15 +79,36 @@ tuned, the six trained models landed at:
 | FCOS | 0.895 | 2.38 |
 | RetinaNet | 0.889 | 2.58 |
 
-**Conclusion.** F1@0.5 spread 0.014; count MAE spread ~1 nucleus/image. For
-"find every one of many near-identical blobs," the head design is not the
-bottleneck once the model is configured to emit enough detections and
-thresholded correctly.
+**Follow-up A (done).** Retrained YOLOv8s, RT-DETR-L, and Faster R-CNN — **3
+seeds each** — on the **official BBBC039 split** (100 train / 50 val / 50 test),
+and scored on the held-out **test** set (4 544 nuclei):
 
-**Confidence: medium.** The spread is within plausible run-to-run noise on a
-40-image val set (§3). The claim is "these architectures with light tuning
-converge," not a proof that architecture never matters. **Follow-up:** 3-seed
-runs with confidence intervals; the official BBBC039 test split.
+| Model | F1@0.5 | mAP@50 | count MAE | best conf |
+|---|---|---|---|---|
+| Faster R-CNN | **0.943 ± 0.001** | 0.960 ± 0.001 | **1.80 ± 0.19** | 0.70 |
+| RT-DETR-L | 0.941 ± 0.002 | 0.958 ± 0.001 | 2.14 ± 0.10 | 0.68 |
+| YOLOv8s | 0.937 ± 0.004 | **0.973 ± 0.002** | 2.21 ± 0.10 | 0.43 |
+
+Seed variance is tiny (F1 σ ≤ 0.004; mAP σ ≤ 0.002) — training is highly
+reproducible. The between-model F1@0.5 spread is **0.006**, now ~1.5–3× the
+within-model σ, so a faint ordering emerges: **Faster R-CNN ≈ RT-DETR ≳
+YOLOv8s** on F1@0.5 — and it *reverses* the mAP@50 ordering (YOLO highest on
+mAP, lowest on F1). The effect is ~0.6 percentage points.
+
+(F1@0.5 is ~0.94 on the official test split vs. ~0.89 on the custom 40-image val
+split used earlier in the study — the official test images are evidently a
+little easier / less dense. Trust the *relative* numbers more than the
+absolutes.)
+
+**Conclusion.** "Architecture barely matters" **holds and is now
+seed-quantified on the canonical benchmark.** "Architecture is irrelevant" does
+*not* — there is a small, reproducible ~0.6-point F1@0.5 edge for the
+two-stage / transformer models over YOLOv8s, which YOLO trades for the best
+mAP@50 and the lowest latency. For a counting deployment the difference is
+practically negligible (count MAE 1.8–2.2, overlapping within ~1σ).
+
+**Confidence: high** (3 seeds, official test split, small σ). The residual
+caveat is single-dataset (§3).
 
 ### 2.2 Per-image detection caps are the dominant lever
 
@@ -249,22 +274,20 @@ NMS IoU) is needed to size the true effect.
 
 ## 3. Limitations
 
-- **Val set is 40 images.** The 0.014 F1 spread among trained models is within
-  plausible run-to-run variance. Conclusions in §2.1 and §2.7 are suggestive,
-  not established.
-- **One training run per model.** No seeds, no confidence intervals.
+- **Main table is one run per model on a custom 40-image val split.** The
+  per-finding tables in §2 (except §2.1's follow-up) are single-seed and use a
+  160/40 split. **§2.1 follow-up A fixes this** for YOLOv8s / RT-DETR-L /
+  Faster R-CNN: 3 seeds on the official 100/50/50 split, scored on the held-out
+  test set. RetinaNet, FCOS, and Cellpose are still single-seed.
 - **Asymmetric tuning.** YOLO's augmentation and learning-rate schedule were
   tuned; the torchvision models got a light, uniform recipe. "Architecture
   doesn't matter" is really "these architectures with modest, roughly-equal
-  effort converge."
+  effort converge." (Follow-up G.)
 - **GT is still imperfect.** The ~0.90 F1 ceiling is measured against
   watershed-derived boxes, not gold manual labels. Some of the residual is
-  label error.
-- **No test-set numbers.** BBBC039 has an official train/val/test split
-  (100/50/50); this study used a custom 160/40 split of the full set and never
-  touched a held-out test set.
+  label error. (Follow-up D.)
 - **Single dataset.** Every conclusion is BBBC039-specific (one cell type, one
-  stain, one nucleus-density regime).
+  stain, one nucleus-density regime). (Follow-up B.)
 
 ---
 
@@ -275,7 +298,7 @@ complete.
 
 | # | Follow-up | Hardens / answers | Status |
 |---|---|---|---|
-| A | Official BBBC039 test split + 3-seed means ± std for YOLOv8s, RT-DETR-L, one torchvision model | §2.1, §2.7 — is the convergence real or noise? | open |
+| A | Official BBBC039 test split + 3-seed means ± std for YOLOv8s, RT-DETR-L, Faster R-CNN | §2.1 — is the convergence real or noise? | **done** — convergence confirmed; F1@0.5 spread 0.006, σ ≤ 0.004; faint FRCNN ≈ RT-DETR ≳ YOLO ordering (`compare/followup_a.json`) |
 | B | Cross-dataset zero-shot eval (DSB2018 / BBBC038) | generalisation — is the counter fit to this stain/density? | open |
 | C | Controlled NMS-free test: matched detection budgets, swept NMS IoU | §2.8 — true size of RT-DETR's recall advantage | open |
 | D | Gold labels on a 10–20 image subset (manual or SAM-assisted); re-measure the F1 ceiling | §2.4 — how much residual is model vs. label | open |

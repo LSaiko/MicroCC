@@ -69,7 +69,10 @@ to the detectors' swept mAP.
 - **Architecture is not the lever.** Six trained models — two-stage,
   anchor-based, anchor-free FCN, YOLO, transformer, and fine-tuned segmentation —
   span F1@0.5 0.889–0.903 and count MAE 1.5–2.6. They separate on **speed** and
-  on whether you need instance masks, not on detection quality.
+  on whether you need instance masks, not on detection quality. A 3-seed run on
+  the **official test split** ([REPORT.md §2.1](REPORT.md)) confirms this: F1@0.5
+  0.937–0.943, per-model σ ≤ 0.004; a faint Faster R-CNN ≈ RT-DETR ≳ YOLOv8s
+  ordering (~0.6 pt) that reverses the mAP@50 order.
 - **The per-image detection cap decides it.** torchvision defaults
   (`detections_per_img` 100–300, `topk_candidates` 1000) are set for COCO's ~7
   objects/image and clip recall on fields of 100–165 nuclei. Raising them lifts

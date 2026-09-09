@@ -36,7 +36,7 @@ def find_weights(arch, seed):
     elif arch == "rtdetr":
         g = glob.glob(f"runs/detect/**/rtdetr_s{seed}*/weights/best.pt", recursive=True)
     else:
-        g = glob.glob(f"compare/runs/followup_a/fasterrcnn_s{seed}/best.pt")
+        g = glob.glob(f"compare/runs/fasterrcnn_s{seed}/best.pt")
     return sorted(g, key=lambda p: pathlib.Path(p).stat().st_mtime)[-1] if g else None
 
 
