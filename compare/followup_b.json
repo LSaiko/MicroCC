@@ -1,0 +1,230 @@
+{
+  "YOLOv8s": {
+    "fluor-far": {
+      "n_images": 454,
+      "n_nuclei": 13989,
+      "F1@0.5_conf0.4": {
+        "mean": 0.618,
+        "std": 0.028
+      },
+      "count_MAE_conf0.4": {
+        "mean": 13.897,
+        "std": 1.151
+      },
+      "count_MAPE_conf0.4": {
+        "mean": 49.967,
+        "std": 4.061
+      },
+      "F1@0.5_best": {
+        "mean": 0.667,
+        "std": 0.023
+      },
+      "count_MAE_best": {
+        "mean": 8.54,
+        "std": 1.855
+      },
+      "count_MAPE_best": {
+        "mean": 43.433,
+        "std": 5.337
+      }
+    },
+    "histology": {
+      "n_images": 106,
+      "n_nuclei": 4556,
+      "F1@0.5_conf0.4": {
+        "mean": 0.016,
+        "std": 0.016
+      },
+      "count_MAE_conf0.4": {
+        "mean": 42.043,
+        "std": 0.887
+      },
+      "count_MAPE_conf0.4": {
+        "mean": 97.467,
+        "std": 2.156
+      },
+      "F1@0.5_best": {
+        "mean": 0.059,
+        "std": 0.034
+      },
+      "count_MAE_best": {
+        "mean": 36.25,
+        "std": 5.306
+      },
+      "count_MAPE_best": {
+        "mean": 80.467,
+        "std": 14.419
+      }
+    },
+    "fluor-near": {
+      "n_images": 92,
+      "n_nuclei": 9552,
+      "F1@0.5_conf0.4": {
+        "mean": 0.78,
+        "std": 0.015
+      },
+      "count_MAE_conf0.4": {
+        "mean": 26.317,
+        "std": 1.116
+      },
+      "count_MAPE_conf0.4": {
+        "mean": 17.867,
+        "std": 1.087
+      },
+      "F1@0.5_best": {
+        "mean": 0.788,
+        "std": 0.011
+      },
+      "count_MAE_best": {
+        "mean": 9.59,
+        "std": 0.926
+      },
+      "count_MAPE_best": {
+        "mean": 7.167,
+        "std": 0.634
+      }
+    },
+    "brightfield": {
+      "n_images": 18,
+      "n_nuclei": 1364,
+      "F1@0.5_conf0.4": {
+        "mean": 0.009,
+        "std": 0.003
+      },
+      "count_MAE_conf0.4": {
+        "mean": 74.813,
+        "std": 0.307
+      },
+      "count_MAPE_conf0.4": {
+        "mean": 98.8,
+        "std": 0.356
+      },
+      "F1@0.5_best": {
+        "mean": 0.102,
+        "std": 0.03
+      },
+      "count_MAE_best": {
+        "mean": 64.59,
+        "std": 3.323
+      },
+      "count_MAPE_best": {
+        "mean": 84.5,
+        "std": 5.181
+      }
+    }
+  },
+  "RT-DETR-L": {
+    "fluor-far": {
+      "n_images": 454,
+      "n_nuclei": 13989,
+      "F1@0.5_conf0.4": {
+        "mean": 0.805,
+        "std": 0.009
+      },
+      "count_MAE_conf0.4": {
+        "mean": 5.263,
+        "std": 0.602
+      },
+      "count_MAPE_conf0.4": {
+        "mean": 34.133,
+        "std": 2.284
+      },
+      "F1@0.5_best": {
+        "mean": 0.799,
+        "std": 0.012
+      },
+      "count_MAE_best": {
+        "mean": 4.697,
+        "std": 0.501
+      },
+      "count_MAPE_best": {
+        "mean": 37.067,
+        "std": 2.91
+      }
+    },
+    "histology": {
+      "n_images": 106,
+      "n_nuclei": 4556,
+      "F1@0.5_conf0.4": {
+        "mean": 0.309,
+        "std": 0.094
+      },
+      "count_MAE_conf0.4": {
+        "mean": 29.797,
+        "std": 8.627
+      },
+      "count_MAPE_conf0.4": {
+        "mean": 141.333,
+        "std": 90.107
+      },
+      "F1@0.5_best": {
+        "mean": 0.333,
+        "std": 0.106
+      },
+      "count_MAE_best": {
+        "mean": 18.283,
+        "std": 3.487
+      },
+      "count_MAPE_best": {
+        "mean": 84.667,
+        "std": 16.418
+      }
+    },
+    "fluor-near": {
+      "n_images": 92,
+      "n_nuclei": 9552,
+      "F1@0.5_conf0.4": {
+        "mean": 0.815,
+        "std": 0.004
+      },
+      "count_MAE_conf0.4": {
+        "mean": 15.723,
+        "std": 0.794
+      },
+      "count_MAPE_conf0.4": {
+        "mean": 11.167,
+        "std": 0.492
+      },
+      "F1@0.5_best": {
+        "mean": 0.806,
+        "std": 0.008
+      },
+      "count_MAE_best": {
+        "mean": 9.953,
+        "std": 0.847
+      },
+      "count_MAPE_best": {
+        "mean": 9.467,
+        "std": 1.603
+      }
+    },
+    "brightfield": {
+      "n_images": 18,
+      "n_nuclei": 1364,
+      "F1@0.5_conf0.4": {
+        "mean": 0.303,
+        "std": 0.013
+      },
+      "count_MAE_conf0.4": {
+        "mean": 31.557,
+        "std": 4.878
+      },
+      "count_MAPE_conf0.4": {
+        "mean": 59.533,
+        "std": 23.421
+      },
+      "F1@0.5_best": {
+        "mean": 0.344,
+        "std": 0.017
+      },
+      "count_MAE_best": {
+        "mean": 14.353,
+        "std": 2.473
+      },
+      "count_MAPE_best": {
+        "mean": 22.2,
+        "std": 3.533
+      }
+    }
+  }
+}

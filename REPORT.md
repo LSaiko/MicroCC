@@ -27,7 +27,10 @@ these were controlled for; the corrections are documented per finding below.
 
 **Practical takeaway:** for dense small-object counting with labels in hand, the
 leverage is in the evaluation harness, the label quality, and the operating-point
-threshold — not the model zoo.
+threshold — not the model zoo. The one place the model *does* matter is
+**robustness**: zero-shot on a different dataset (§2.9), RT-DETR-L holds F1@0.5
+0.80 on out-of-domain fluorescence where YOLOv8s drops to 0.67 — a gap that is
+invisible in-domain.
 
 ---
 
@@ -104,11 +107,13 @@ absolutes.)
 seed-quantified on the canonical benchmark.** "Architecture is irrelevant" does
 *not* — there is a small, reproducible ~0.6-point F1@0.5 edge for the
 two-stage / transformer models over YOLOv8s, which YOLO trades for the best
-mAP@50 and the lowest latency. For a counting deployment the difference is
-practically negligible (count MAE 1.8–2.2, overlapping within ~1σ).
+mAP@50 and the lowest latency. For an *in-domain* counting deployment the
+difference is practically negligible (count MAE 1.8–2.2, overlapping within
+~1σ). **Under distribution shift this reverses sharply** — see §2.9, where
+RT-DETR-L beats YOLOv8s by 0.13 F1 zero-shot on out-of-domain fluorescence.
 
-**Confidence: high** (3 seeds, official test split, small σ). The residual
-caveat is single-dataset (§3).
+**Confidence: high** (3 seeds, official test split, small σ) — for the
+in-domain claim.
 
 ### 2.2 Per-image detection caps are the dominant lever
 
@@ -270,6 +275,49 @@ NMS IoU) is needed to size the true effect.
 
 **Confidence: low.** Confounded; flagged as a follow-up.
 
+### 2.9 Cross-dataset: the counter transfers within fluorescence, and RT-DETR transfers *much* better
+
+**Claim.** A model trained only on BBBC039 (U2OS, Hoechst, 520×696) counts nuclei
+in fluorescence images from other sources with a real but recoverable accuracy
+loss; it fails on other imaging modalities; and — unlike in-domain — the
+architecture choice matters a lot.
+
+**Path (follow-up B).** Evaluated the follow-up-A checkpoints (YOLOv8s,
+RT-DETR-L, 3 seeds each) **zero-shot** on the Data Science Bowl 2018 /
+BBBC038 `stage1_train` set (670 images, multi-modal), bucketed by modality:
+
+| Bucket (n images / nuclei) | YOLOv8s F1@0.5 / count MAPE | RT-DETR-L F1@0.5 / count MAPE |
+|---|---|---|
+| *BBBC039 test (in-domain ref, §2.1)* | *0.937 / ~2%* | *0.941 / ~2%* |
+| fluor-near — U2OS/Hoechst assay family, 520×696 (92 / 9.5k) | 0.79 / **7%** | 0.81 / **9%** |
+| fluor-far — other fluorescence: cell types, stains, magnifications (454 / 14k) | 0.67 / 43% | **0.80 / 37%** |
+| histology (H&E), out of modality (106 / 4.6k) | 0.06 / 80% | 0.33 / 85% |
+| brightfield, out of modality (18 / 1.4k) | 0.10 / — | 0.34 / — |
+
+(F1 at each model's re-swept confidence; 3-seed σ ≤ 0.03. Brightfield n = 18 is
+too small to trust.)
+
+**Conclusions.**
+- **Transfers within the fluorescence-nucleus modality.** On images from the
+  same assay family (fluor-near) the counter is within **7–9% count error
+  zero-shot**. On genuinely different fluorescence (fluor-far — other cell
+  types, stains, magnifications, and densities well outside training), F1 drops
+  ~0.14 (RT-DETR) to ~0.27 (YOLO) and count error rises to 37–43% — degraded but
+  not broken.
+- **RT-DETR-L generalises much better than YOLOv8s** — fluor-far F1 0.80 vs 0.67,
+  count MAE 4.7 vs 8.5. **This gap does not exist in-domain** (§2.1: 0.941 vs
+  0.937). Under distribution shift the transformer / NMS-free set-prediction
+  model is clearly the more robust choice. The "architecture barely matters"
+  conclusion is *in-domain only*.
+- **Imaging-modality shift breaks it**, as expected — dark-nuclei-on-light
+  (H&E, brightfield) is inverted contrast the model never saw. RT-DETR salvages
+  partial signal; YOLO essentially fails.
+- **Re-tune the confidence for a new domain** (§2.6 again): YOLO's fluor-far
+  count MAE goes 13.9 → 8.5 from the sweep; RT-DETR 5.3 → 4.7.
+
+**Confidence: high** for the direction and the RT-DETR-vs-YOLO gap (3 seeds,
+454-image bucket, σ ≤ 0.03). Absolute numbers are bucket-heuristic-dependent.
+
 ---
 
 ## 3. Limitations
@@ -286,8 +334,12 @@ NMS IoU) is needed to size the true effect.
 - **GT is still imperfect.** The ~0.90 F1 ceiling is measured against
   watershed-derived boxes, not gold manual labels. Some of the residual is
   label error. (Follow-up D.)
-- **Single dataset.** Every conclusion is BBBC039-specific (one cell type, one
-  stain, one nucleus-density regime). (Follow-up B.)
+- **Single training dataset.** The model is trained only on BBBC039 (one cell
+  type, stain, magnification, density regime). **Follow-up B (§2.9)** tests
+  zero-shot transfer to DSB2018 and bounds this: the conclusions hold within the
+  fluorescence-nucleus modality (better the closer the assay), break under
+  imaging-modality shift, and the architecture-equivalence finding is in-domain
+  only.
 
 ---
 
@@ -299,7 +351,7 @@ complete.
 | # | Follow-up | Hardens / answers | Status |
 |---|---|---|---|
 | A | Official BBBC039 test split + 3-seed means ± std for YOLOv8s, RT-DETR-L, Faster R-CNN | §2.1 — is the convergence real or noise? | **done** — convergence confirmed; F1@0.5 spread 0.006, σ ≤ 0.004; faint FRCNN ≈ RT-DETR ≳ YOLO ordering (`compare/followup_a.json`) |
-| B | Cross-dataset zero-shot eval (DSB2018 / BBBC038) | generalisation — is the counter fit to this stain/density? | open |
+| B | Cross-dataset zero-shot eval (DSB2018 / BBBC038) | generalisation — is the counter fit to this stain/density? | **done — §2.9.** Transfers within fluorescence (7–9% count error on the same assay family, 37–43% on far fluorescence); breaks on H&E/brightfield; RT-DETR generalises far better than YOLO (F1 0.80 vs 0.67 out-of-domain). `compare/followup_b.json` |
 | C | Controlled NMS-free test: matched detection budgets, swept NMS IoU | §2.8 — true size of RT-DETR's recall advantage | open |
 | D | Gold labels on a 10–20 image subset (manual or SAM-assisted); re-measure the F1 ceiling | §2.4 — how much residual is model vs. label | open |
 | E | Count-calibrated training: count-consistency loss or learned per-image threshold | §2.6 — remove the post-hoc sweep | open |
@@ -315,6 +367,10 @@ Full pipeline, per-model training commands, and the raw results table are in
 (detectors) + `compare/cellpose_baseline.py` (segmentation). GT construction:
 `bbbc039/masks_to_yolo.py`. Trained YOLOv8s weights: GitHub release
 [v0.2.0](https://github.com/LSaiko/MicroCC/releases/tag/v0.2.0).
+
+Follow-ups: `compare/followup_a_{train,eval}.py` (§2.1, official split + seeds),
+`compare/followup_b.py` (§2.9, cross-dataset — needs DSB2018 `stage1_train`:
+`curl -O https://data.broadinstitute.org/bbbc/BBBC038/stage1_train.zip`).
 
 ---
 

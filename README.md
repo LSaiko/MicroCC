@@ -66,13 +66,17 @@ to the detectors' swept mAP.
 
 #### Significance
 
-- **Architecture is not the lever.** Six trained models — two-stage,
+- **Architecture is not the lever — in-domain.** Six trained models — two-stage,
   anchor-based, anchor-free FCN, YOLO, transformer, and fine-tuned segmentation —
-  span F1@0.5 0.889–0.903 and count MAE 1.5–2.6. They separate on **speed** and
-  on whether you need instance masks, not on detection quality. A 3-seed run on
-  the **official test split** ([REPORT.md §2.1](REPORT.md)) confirms this: F1@0.5
-  0.937–0.943, per-model σ ≤ 0.004; a faint Faster R-CNN ≈ RT-DETR ≳ YOLOv8s
-  ordering (~0.6 pt) that reverses the mAP@50 order.
+  span F1@0.5 0.889–0.903 and count MAE 1.5–2.6. A 3-seed run on the **official
+  test split** ([REPORT.md §2.1](REPORT.md)) confirms it: F1@0.5 0.937–0.943,
+  per-model σ ≤ 0.004; a faint Faster R-CNN ≈ RT-DETR ≳ YOLOv8s ordering (~0.6 pt)
+  that reverses the mAP@50 order.
+- **…but architecture *is* the lever for robustness.** Zero-shot on DSB2018
+  ([§2.9](REPORT.md)), RT-DETR-L holds F1@0.5 **0.80** on out-of-domain
+  fluorescence where YOLOv8s drops to **0.67**. The counter transfers within the
+  fluorescence-nucleus modality (7–9% count error on a similar assay), degrades
+  on far fluorescence (37–43%), and breaks on H&E / brightfield.
 - **The per-image detection cap decides it.** torchvision defaults
   (`detections_per_img` 100–300, `topk_candidates` 1000) are set for COCO's ~7
   objects/image and clip recall on fields of 100–165 nuclei. Raising them lifts
@@ -132,14 +136,17 @@ the obvious next experiment. CPU-only inference is viable for one-off counts
    the detectors (F1 0.903); zero-shot loses.
 3. ~~**Improve the mask→box GT.**~~ ✅ Watershed instances + size filter +
    Hungarian matching. F1 ceiling ~0.88 → ~0.90; count MAE dropped ~40 %.
-4. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU.
-5. **Tiling (SAHI)** — 512 px tiles, 20 % overlap; may lift recall on the
+4. ~~**3-seed run on the official test split (follow-up A).**~~ ✅ Convergence
+   confirmed; faint FRCNN ≈ RT-DETR ≳ YOLO ordering.
+5. ~~**Cross-dataset generalisation (follow-up B).**~~ ✅ Transfers within
+   fluorescence; RT-DETR far more robust than YOLO out-of-domain; breaks on
+   H&E/brightfield.
+6. **RT-DETR at 1280 + longer schedule** on a ≥16 GB GPU.
+7. **Tiling (SAHI)** — 512 px tiles, 20 % overlap; may lift recall on the
    densest fields without more resolution.
-6. **Cross-dataset generalisation** — train BBBC039, test zero-shot on
-   BBBC038 / DSB2018.
-7. **Count-calibrated training** — a count-consistency loss or learned per-image
+8. **Count-calibrated training** — a count-consistency loss or learned per-image
    threshold, so the model optimises the deployed metric directly.
-8. **StarDist** as a second segmentation baseline.
+9. **StarDist** as a second segmentation baseline.
 
 Full study, corrections, and per-model detail: [compare/RESULTS.md](compare/RESULTS.md).
 
